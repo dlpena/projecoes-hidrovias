@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hidrovias — Projeções de cota por analogia</title>
+  <link rel="stylesheet" href="css/estilo.css">
+  <script src="vendor/plotly.min.js"></script>
+</head>
+<body>
+  <header class="topo">
+    <div>
+      <h1>Projeções de cota por analogia</h1>
+      <p class="subtitulo">Série integrada (HIDRO consistido &gt; bruto &gt; telemetria) · cotas em cm</p>
+    </div>
+    <div class="topo-acoes">
+      <nav id="nav-estacoes" class="nav-estacoes"></nav>
+      <div class="topo-meta">
+        <span id="carimbo">Carregando…</span>
+        <a id="link-pdf" href="pdf/projecoes.pdf" target="_blank" rel="noopener">Baixar PDF do conjunto</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="conteudo"></main>
+
+  <footer class="rodape">
+    <p>Metodologia: a partir do último dado do ano corrente (dia D), são selecionados os anos
+    históricos cuja cota no mesmo dia/mês está dentro do range escolhido (tolerância de ±3 dias
+    quando falta o dado exato; exige-se ≥80% de cobertura entre D e 31/dez e dado nos últimos
+    10 dias do ano). As trajetórias projetadas são as dos anos de maior e menor queda até 31/dez
+    e a média de todos os análogos, deslocadas para coincidir com a cota atual no dia D.
+    Fonte: data lake da ANA (banco HIDRO e telemetria).</p>
+  </footer>
+
+  <script src="js/analogia.js"></script>
+  <script src="js/grafico.js"></script>
+  <script src="js/principal.js"></script>
+</body>
+</html>

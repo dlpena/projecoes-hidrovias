@@ -1,0 +1,5 @@
+# O projeto roda com o venv do "app bancos ANA" ([caminho local removido]),
+# que já contém pyodbc, msal, pandas, plotly. Dependências extras deste projeto:
+pyarrow>=15
+kaleido==0.2.1
+reportlab>=4,<5
