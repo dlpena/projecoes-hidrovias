@@ -60,7 +60,7 @@ python -c "from ana_datalake import connect; connect('hidro')"
 powershell -ExecutionPolicy Bypass -File agendamento\registrar_tarefa.ps1
 ```
 
-Cria a tarefa `HidroviasJoaquim-Atualizar` (06:30 e 17:30). Requer usuário logado
+Cria a tarefa `HidroviasJoaquim-Atualizar` (10:00 e 14:00). Requer usuário logado
 (o token MSAL é do perfil). Logs em `logs\`.
 
 ## Internalização no ambiente ANA
