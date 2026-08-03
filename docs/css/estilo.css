@@ -103,6 +103,8 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
 .contagem { font-weight: 600; color: var(--tinta); }
 .acoes { margin-left: auto; display: flex; gap: 6px; }
 .botao-csv {
+  display: inline-block;
+  text-decoration: none;
   font: inherit;
   font-size: 0.84rem;
   padding: 5px 14px;
