@@ -36,15 +36,34 @@ def configurar_log() -> None:
     )
 
 
+def _processo_vivo(pid: int) -> bool:
+    import ctypes
+    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+    h = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+    if not h:
+        return False
+    ctypes.windll.kernel32.CloseHandle(h)
+    return True
+
+
 def adquirir_lock() -> bool:
+    import os
     if LOCK.exists():
         idade = time.time() - LOCK.stat().st_mtime
-        if idade < LOCK_VALIDADE_S:
+        dono = None
+        try:
+            dono = int(LOCK.read_text(encoding="utf-8").split(";")[0])
+        except (ValueError, OSError):
+            pass
+        if dono is not None and not _processo_vivo(dono):
+            log.warning("Lock órfão (processo %d morto) — ignorando.", dono)
+        elif idade < LOCK_VALIDADE_S:
             log.error("Outra rodada em andamento (lock com %.0f min). Abortando.", idade / 60)
             return False
-        log.warning("Lock antigo (%.1f h) — ignorando.", idade / 3600)
+        else:
+            log.warning("Lock antigo (%.1f h) — ignorando.", idade / 3600)
     LOCK.parent.mkdir(parents=True, exist_ok=True)
-    LOCK.write_text(datetime.now().isoformat(), encoding="utf-8")
+    LOCK.write_text(f"{os.getpid()};{datetime.now().isoformat()}", encoding="utf-8")
     return True
 
 

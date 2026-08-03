@@ -182,7 +182,9 @@ const Grafico = (() => {
       paper_bgcolor: "rgba(0,0,0,0)",
       plot_bgcolor: "rgba(0,0,0,0)",
       font: { family: "Segoe UI, system-ui, sans-serif", size: 12, color: "#555" },
+      dragmode: false,   // sem zoom/pan por clique-e-arraste
       xaxis: {
+        fixedrange: true,
         tickvals: MESES.map((_, m) => `${r.ano_atual}-${String(m + 1).padStart(2, "0")}-01`),
         ticktext: MESES,
         hoverformat: "%d/%m",
@@ -190,6 +192,7 @@ const Grafico = (() => {
         range: [`${r.ano_atual}-01-01`, `${r.ano_atual}-12-31`],
       },
       yaxis: {
+        fixedrange: true,
         title: { text: "Cota (cm)", font: { size: 12 } },
         gridcolor: "#efefec",
         zeroline: false,

@@ -127,12 +127,12 @@ def figura_estacao(doc: dict, resultado: dict) -> go.Figure:
             _linha(fig, serie, datas, str(ano), CORES["analogo"], 1)
         _linha(fig, tj["maior_queda"], datas,
                f"Maior queda ({r['ano_maior_queda']}{_rotulo_queda(r, r['ano_maior_queda'])})",
-               CORES["maior"], 2, "dash", legenda=True)
+               CORES["maior"], 2, legenda=True)
         _linha(fig, tj["menor_queda"], datas,
                f"Menor queda ({r['ano_menor_queda']}{_rotulo_queda(r, r['ano_menor_queda'])})",
-               CORES["menor"], 2, "dash", legenda=True)
+               CORES["menor"], 2, legenda=True)
         _linha(fig, tj["media"], datas, f"Média ({len(r['selecionados'])} anos)",
-               CORES["media"], 2, legenda=True)
+               CORES["media"], 2, "dot", legenda=True)
     _linha(fig, doc["anos"][str(r["ano_atual"])], datas,
            f"Observado {r['ano_atual']}", CORES["observado"], 2.5, legenda=True)
 
