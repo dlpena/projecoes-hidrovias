@@ -36,6 +36,23 @@
         main.appendChild(p);
       }
     }
+
+    // PDF do conjunto: gerado na hora, com os gráficos como estão na tela
+    const btn = document.getElementById("btn-pdf-conjunto");
+    btn.disabled = false;
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      const original = btn.textContent;
+      btn.textContent = "Gerando…";
+      try {
+        await ExportarPDF.gerarConjunto([...Grafico.registro.values()]);
+      } catch (err) {
+        alert(`Falha ao gerar o PDF: ${err.message}`);
+      } finally {
+        btn.textContent = original;
+        btn.disabled = false;
+      }
+    });
   } catch (err) {
     main.innerHTML = `<p class="erro">Falha ao carregar os dados (${err.message}).
       Se abriu o arquivo localmente (file://), sirva a pasta com

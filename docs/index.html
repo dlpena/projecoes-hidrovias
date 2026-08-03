@@ -17,7 +17,8 @@
       <nav id="nav-estacoes" class="nav-estacoes"></nav>
       <div class="topo-meta">
         <span id="carimbo">Carregando…</span>
-        <a id="link-pdf" href="pdf/projecoes.pdf" target="_blank" rel="noopener">Baixar PDF do conjunto</a>
+        <button id="btn-pdf-conjunto" type="button" disabled
+                title="PDF com os 6 gráficos exatamente como estão na tela (ranges ajustados)">Baixar PDF do conjunto</button>
       </div>
     </div>
   </header>
@@ -35,8 +36,11 @@
     Fonte: data lake da ANA (banco HIDRO e telemetria).</p>
   </footer>
 
+  <script src="vendor/jspdf.umd.min.js"></script>
+  <script src="vendor/jspdf.plugin.autotable.min.js"></script>
   <script src="js/analogia.js"></script>
   <script src="js/grafico.js"></script>
+  <script src="js/exportar_pdf.js"></script>
   <script src="js/principal.js"></script>
 </body>
 </html>

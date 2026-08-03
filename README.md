@@ -10,11 +10,14 @@ pelo data lake da ANA via pipeline local.
    da ANA (série integrada: HIDRO consistido > bruto > telemetria), de forma
    **incremental** — o histórico já consolidado fica congelado em
    `dados/cache/*.parquet` e cada rodada consulta só a janela recente.
-2. Gera `docs/dados/{estacao}.json` (matriz ano × dia, cm) + `docs/pdf/projecoes.pdf`
-   e faz `git push` — o GitHub Pages (branch main, pasta `/docs`) publica o site.
-3. **Site** (`docs/`): HTML+JS puro com Plotly vendorizado — o cálculo da analogia
-   roda no navegador, então o range (± cm ou %) é ajustável com resposta imediata.
-   Cada gráfico exporta um CSV de memória de cálculo auditável.
+2. Gera `docs/dados/{estacao}.json` (matriz ano × dia, cm) e faz `git push` — o
+   GitHub Pages (branch main, pasta `/docs`) publica o site.
+3. **Site** (`docs/`): HTML+JS puro com Plotly e jsPDF vendorizados — o cálculo da
+   analogia roda no navegador, então o range (± cm ou %) é ajustável com resposta
+   imediata. **Todas as exportações são geradas na hora, refletindo o que está na
+   tela**: PDF do conjunto (capa + 6 gráficos como visualizados), memória de
+   cálculo em PDF por estação (parâmetros, cobertura por fonte, anos candidatos,
+   projeções e série dia a dia) e CSV.
 
 ## Metodologia da projeção
 
@@ -38,7 +41,7 @@ python atualizar.py
 
 # opções
 python atualizar.py --full --estacao itaituba   # refaz o cache de uma estação
-python atualizar.py --sem-pdf --sem-push        # só dados
+python atualizar.py --sem-push                  # sem publicar
 
 # testes (inclui paridade Python <-> JS do algoritmo)
 python -m pytest tests/ -q

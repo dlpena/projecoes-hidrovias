@@ -2,6 +2,7 @@
 "use strict";
 
 const Grafico = (() => {
+  const REGISTRO = new Map(); // slug -> {doc, grafico, resultado atual} p/ o PDF do conjunto
   const CORES = {
     observado: "#1a1a1a",
     maiorQueda: "#D55E00",
@@ -302,8 +303,8 @@ const Grafico = (() => {
         </span>
         <span>Anos análogos: <span class="contagem">–</span></span>
         <span class="acoes">
-          <a class="botao-csv botao-memoria" href="pdf/memoria_${doc.slug}.pdf" download
-             title="Gerada na última atualização do pipeline, com o range inicial automático. Para o range ajustado, use o CSV.">Memória de cálculo (PDF)</a>
+          <button type="button" class="botao-csv botao-memoria"
+             title="Memória de cálculo em PDF com o range ajustado nos controles">Memória de cálculo (PDF)</button>
           <button type="button" class="botao-csv botao-sec" title="Memória de cálculo em CSV com o range ajustado nos controles">CSV</button>
         </span>
       </div>
@@ -384,13 +385,25 @@ const Grafico = (() => {
     }
     el.btnCm.addEventListener("click", () => trocarModo("cm"));
     el.btnPct.addEventListener("click", () => trocarModo("pct"));
+    sec.querySelector(".botao-memoria").addEventListener("click", () => {
+      const r = estado.resultado || Analogia.calcular(doc, estado.range, estado.modo);
+      ExportarPDF.gerarMemoria(doc, r);
+    });
     el.csv.addEventListener("click", () => {
       const r = estado.resultado || Analogia.calcular(doc, estado.range, estado.modo);
       baixarCSV(`analogia_${doc.slug}_${doc.ultima_data}.csv`, gerarCSV(doc, r));
     });
 
+    REGISTRO.set(doc.slug, {
+      doc,
+      grafico: el.grafico,
+      get resultado() {
+        return estado.resultado || Analogia.calcular(doc, estado.range, estado.modo);
+      },
+    });
+
     render();
   }
 
-  return { montarSecao };
+  return { montarSecao, datasDoAno, minimoTrajetoria, registro: REGISTRO };
 })();

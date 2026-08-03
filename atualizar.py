@@ -1,7 +1,10 @@
-"""Orquestrador do pipeline: fetch incremental -> série integrada -> JSONs -> PDF -> push.
+"""Orquestrador do pipeline: fetch incremental -> série integrada -> JSONs -> push.
+
+Os PDFs (conjunto e memórias de cálculo) são gerados no navegador, refletindo o
+range ajustado pelo usuário — o pipeline só publica os dados.
 
 Uso:
-    atualizar.py [--full] [--estacao SLUG] [--sem-pdf] [--sem-push]
+    atualizar.py [--full] [--estacao SLUG] [--sem-push]
 
 Exit codes: 0 ok · 1 falha geral · 2 token expirado (renove com:
     python -c "from ana_datalake import connect; connect('hidro')")
@@ -84,7 +87,6 @@ def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--full", action="store_true", help="refaz o cache da(s) estação(ões) do zero")
     p.add_argument("--estacao", metavar="SLUG", help="processa só esta estação")
-    p.add_argument("--sem-pdf", action="store_true")
     p.add_argument("--sem-push", action="store_true")
     args = p.parse_args()
 
@@ -125,16 +127,6 @@ def main() -> int:
 
         if resumos:
             exportar_json.exportar_indice(mesclar_indice(resumos))
-
-        if resumos and not args.sem_pdf:
-            try:
-                from pipeline import gerar_pdf
-                gerar_pdf.gerar()
-                log.info("PDF gerado.")
-            except ImportError:
-                log.warning("gerar_pdf ainda não disponível — pulando PDF.")
-            except Exception:
-                log.exception("Falha na geração do PDF — seguindo sem ele.")
 
         if resumos and not args.sem_push:
             try:

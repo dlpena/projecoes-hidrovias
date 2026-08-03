@@ -33,9 +33,19 @@ body {
 .topo h1 { margin: 0; font-size: 1.35rem; }
 .subtitulo { margin: 2px 0 0; color: var(--tinta-2); font-size: 0.86rem; }
 .topo-acoes { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
-.topo-meta { display: flex; gap: 16px; font-size: 0.84rem; color: var(--tinta-2); }
-.topo-meta a { color: var(--acento); font-weight: 600; text-decoration: none; }
-.topo-meta a:hover { text-decoration: underline; }
+.topo-meta { display: flex; gap: 16px; align-items: center; font-size: 0.84rem; color: var(--tinta-2); }
+.topo-meta button {
+  font: inherit;
+  font-weight: 600;
+  color: var(--acento);
+  background: var(--cartao);
+  border: 1px solid var(--acento);
+  border-radius: 6px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+.topo-meta button:hover:enabled { background: var(--acento); color: #fff; }
+.topo-meta button:disabled { opacity: 0.6; cursor: wait; }
 
 .nav-estacoes { display: flex; flex-wrap: wrap; gap: 6px; }
 .nav-estacoes a {

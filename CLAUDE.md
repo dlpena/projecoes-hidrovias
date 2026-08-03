@@ -17,14 +17,16 @@ fluviométricas, alimentado por pipeline Python local agendado 2x/dia.
 - O algoritmo de analogia existe em **dois espelhos que devem permanecer idênticos**:
   `pipeline/analogia.py` (fonte da verdade, usada no PDF) e `docs/js/analogia.js` (site, range dinâmico).
   Qualquer mudança de regra deve ser aplicada nos dois e coberta por `tests/test_analogia.py`.
-- Front-end: HTML+JS puro, sem build, Plotly vendorizado em `docs/vendor/` (não usar CDN — o site deve
-  ser autocontido para internalização na ANA).
+- Front-end: HTML+JS puro, sem build, Plotly e jsPDF vendorizados em `docs/vendor/` (não usar CDN — o
+  site deve ser autocontido para internalização na ANA).
+- **Exportações (PDF do conjunto, memória de cálculo em PDF e CSV) são geradas no navegador**
+  (`docs/js/exportar_pdf.js`) refletindo o range ajustado pelo usuário — o pipeline não gera PDF.
 - Estações: definidas apenas em `estacoes.py` (o site lê `docs/dados/indice.json` gerado dali).
 
 ## Comandos
 
 - Atualização completa de uma estação: `atualizar.py --full --estacao itaituba`
 - Rodada incremental normal (todas): `atualizar.py`
-- Sem push / sem PDF: `--sem-push`, `--sem-pdf`
+- Sem push: `--sem-push`
 - Teste local do site: `python -m http.server` dentro de `docs/` (fetch não funciona via file://)
 - Testes: `python -m pytest tests/ -q`
