@@ -101,8 +101,8 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
   color: #fff;
 }
 .contagem { font-weight: 600; color: var(--tinta); }
+.acoes { margin-left: auto; display: flex; gap: 6px; }
 .botao-csv {
-  margin-left: auto;
   font: inherit;
   font-size: 0.84rem;
   padding: 5px 14px;
@@ -113,6 +113,8 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
   cursor: pointer;
 }
 .botao-csv:hover { background: var(--acento); color: #fff; }
+.botao-sec { border-color: var(--borda); color: var(--tinta-2); }
+.botao-sec:hover { background: var(--superficie); color: var(--tinta); }
 
 .aviso {
   margin: 8px 0 0;

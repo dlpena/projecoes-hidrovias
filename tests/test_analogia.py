@@ -158,6 +158,41 @@ def test_29fev_ano_nao_bissexto_ignorado():
     assert c["cobertura"] == 1.0 and c["selecionado"]
 
 
+def test_range_inicial():
+    """Menor range (>=10) que contém pelo menos 3 análogos."""
+    anos = {"2026": serie_constante(500, 0, IDX_1JUL + 1, 2026)}
+    for ano, cota in (("2001", 502), ("2002", 512), ("2003", 527), ("2004", 560)):
+        anos[ano] = serie_constante(cota, ano=int(ano))
+    # distâncias: 2, 12, 27, 60 -> 3ª menor = 27
+    assert analogia.range_inicial(doc_base(anos)) == 27
+    # com só 2 anos elegíveis, cobre todos (distâncias 2, 12 -> 12)
+    anos2 = {k: anos[k] for k in ("2026", "2001", "2002")}
+    assert analogia.range_inicial(doc_base(anos2)) == 12
+    # distâncias pequenas: nunca abaixo de 10
+    anos3 = {"2026": anos["2026"],
+             "2001": serie_constante(501, ano=2001),
+             "2002": serie_constante(503, ano=2002),
+             "2003": serie_constante(504, ano=2003)}
+    assert analogia.range_inicial(doc_base(anos3)) == 10
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node não disponível")
+def test_paridade_range_inicial():
+    real = RAIZ / "docs" / "dados" / "itaituba.json"
+    if not real.exists():
+        pytest.skip("itaituba.json ausente")
+    doc = json.loads(real.read_text(encoding="utf-8"))
+    r_py = analogia.range_inicial(doc)
+    script = (
+        "const A = require(%s);"
+        "const doc = JSON.parse(require('fs').readFileSync(0, 'utf8'));"
+        "console.log(JSON.stringify(A.rangeInicial(doc)));"
+    ) % json.dumps(str(RAIZ / "docs" / "js" / "analogia.js"))
+    out = subprocess.run(["node", "-e", script], input=json.dumps(doc),
+                         capture_output=True, text=True, check=True, encoding="utf-8")
+    assert json.loads(out.stdout) == r_py
+
+
 @pytest.mark.skipif(shutil.which("node") is None, reason="node não disponível")
 def test_paridade_python_js():
     """Mesmo resultado no Python e no JS para dados reais e sintéticos."""

@@ -57,6 +57,19 @@ const Analogia = (() => {
     return [out, flags];
   }
 
+  /** Menor range inteiro (cm, >= minimo) que seleciona pelo menos minAnalogos anos.
+   * Espelho de analogia.range_inicial(). */
+  function rangeInicial(doc, minAnalogos = MIN_ANALOGOS, minimo = 10.0) {
+    const r = calcular(doc, Infinity, "cm");
+    const dists = r.candidatos
+      .filter((c) => c.selecionado)
+      .map((c) => Math.abs(c.cota_em_d - r.cota_atual))
+      .sort((a, b) => a - b);
+    if (!dists.length) return minimo;
+    const alvo = dists.length >= minAnalogos ? dists[minAnalogos - 1] : dists[dists.length - 1];
+    return Math.max(minimo, Math.ceil(alvo));
+  }
+
   /** Calcula a analogia. modo: "cm" ou "pct". Espelho de analogia.calcular(). */
   function calcular(doc, rangeValor = 10.0, modo = "cm") {
     const anos = doc.anos;
@@ -179,7 +192,7 @@ const Analogia = (() => {
     return resultado;
   }
 
-  return { calcular, indiceDia, bissexto, IDX_29FEV, MIN_ANALOGOS };
+  return { calcular, rangeInicial, indiceDia, bissexto, IDX_29FEV, MIN_ANALOGOS };
 })();
 
 /* Para testes de paridade com Node (ignora no navegador). */

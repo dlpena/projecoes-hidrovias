@@ -3,15 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Hidrovias — Projeções de cota por analogia</title>
+  <title>Projeções de Nível — Estações-Chave para Hidrovias</title>
   <link rel="stylesheet" href="css/estilo.css">
   <script src="vendor/plotly.min.js"></script>
 </head>
 <body>
   <header class="topo">
     <div>
-      <h1>Projeções de cota por analogia</h1>
-      <p class="subtitulo">Série integrada (HIDRO consistido &gt; bruto &gt; telemetria) · cotas em cm</p>
+      <h1>Projeções de Nível — Estações-Chave para Hidrovias</h1>
+      <p class="subtitulo">Projeção por analogia · série integrada (HIDRO consistido &gt; bruto &gt; telemetria) · cotas em cm</p>
     </div>
     <div class="topo-acoes">
       <nav id="nav-estacoes" class="nav-estacoes"></nav>
@@ -29,7 +29,9 @@
     históricos cuja cota no mesmo dia/mês está dentro do range escolhido (tolerância de ±3 dias
     quando falta o dado exato; exige-se ≥80% de cobertura entre D e 31/dez e dado nos últimos
     10 dias do ano). As trajetórias projetadas são as dos anos de maior e menor queda até 31/dez
-    e a média de todos os análogos, deslocadas para coincidir com a cota atual no dia D.
+    e a média de todos os análogos, deslocadas para coincidir com a cota atual no dia D; as
+    curvas cinzas são as trajetórias deslocadas de todos os anos análogos. O range inicial de
+    cada gráfico é o menor (≥10 cm) que contém pelo menos 3 anos análogos.
     Fonte: data lake da ANA (banco HIDRO e telemetria).</p>
   </footer>
 

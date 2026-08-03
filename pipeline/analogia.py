@@ -25,6 +25,8 @@ posição 59 é ignorada nos cálculos.
 
 from __future__ import annotations
 
+import math
+
 TOLERANCIA_DIAS = 3
 COBERTURA_MINIMA = 0.8
 DIAS_FIM_ANO = 10
@@ -78,6 +80,23 @@ def _interpolar(valores: list) -> tuple[list, list]:
                 out[i] = va + (vb - va) * (i - a) / (b - a)
                 flags[i] = True
     return out, flags
+
+
+def range_inicial(doc: dict, min_analogos: int = MIN_ANALOGOS, minimo: float = 10.0) -> float:
+    """Menor range inteiro (cm, >= minimo) que seleciona pelo menos min_analogos anos.
+
+    Se nem com range infinito há min_analogos anos elegíveis, retorna o range que
+    inclui todos os elegíveis (ou o mínimo, se não houver nenhum).
+    """
+    r = calcular(doc, float("inf"), "cm")
+    dists = sorted(
+        abs(c["cota_em_d"] - r["cota_atual"])
+        for c in r["candidatos"] if c["selecionado"]
+    )
+    if not dists:
+        return minimo
+    alvo = dists[min_analogos - 1] if len(dists) >= min_analogos else dists[-1]
+    return max(minimo, float(math.ceil(alvo)))
 
 
 def calcular(doc: dict, range_valor: float = 10.0, modo: str = "cm") -> dict:

@@ -1,8 +1,9 @@
 """Gera docs/pdf/projecoes.pdf: capa + 1 página A4 paisagem por estação.
 
-Usa o range default (±10 cm) — no site o range é ajustável. As figuras são as
-mesmas do site (mesmo algoritmo, pipeline/analogia.py), exportadas em PNG via
-kaleido e montadas com reportlab.
+Usa o range inicial automático de cada estação (menor ≥10 cm com pelo menos
+3 anos análogos) — no site o range segue ajustável. As figuras são as mesmas
+do site (mesmo algoritmo, pipeline/analogia.py), exportadas em PNG via kaleido
+e montadas com reportlab.
 """
 
 from __future__ import annotations
@@ -19,7 +20,6 @@ from pipeline import DIR_DADOS_SITE, DIR_PDF
 from pipeline import analogia
 from estacoes import ESTACOES
 
-RANGE_DEFAULT = 10.0
 MODO_DEFAULT = "cm"
 
 CORES = {
@@ -55,23 +55,34 @@ def _linha(fig, serie, datas, nome, cor, largura, tracejado=None, legenda=False)
     ))
 
 
+def _minimo_trajetoria(serie: list, datas: list, idx_d: int) -> tuple:
+    minimo, data_min = None, None
+    for i in range(idx_d, 366):
+        if datas[i] is not None and serie[i] is not None:
+            if minimo is None or serie[i] < minimo:
+                minimo, data_min = serie[i], datas[i]
+    return minimo, data_min
+
+
+def _marcador(fig, x, y, texto, cor, posicao):
+    fig.add_trace(go.Scatter(
+        x=[x], y=[y], mode="markers+text", text=[texto], textposition=posicao,
+        marker={"color": cor, "size": 8}, textfont={"size": 12, "color": cor},
+        cliponaxis=False, hoverinfo="skip", showlegend=False,
+    ))
+
+
 def figura_estacao(doc: dict, resultado: dict) -> go.Figure:
     """Mesma figura do site (grafico.js), em plotly Python."""
     r = resultado
     datas = _datas_do_ano(r["ano_atual"])
-    selecionados = set(r["selecionados"])
     fig = go.Figure()
-
-    for chave in sorted(doc["anos"]):
-        ano = int(chave)
-        if ano == r["ano_atual"] or ano in selecionados:
-            continue
-        _linha(fig, doc["anos"][chave], datas, str(ano), CORES["comum"], 1)
-    for ano in r["selecionados"]:
-        _linha(fig, doc["anos"][str(ano)], datas, str(ano), CORES["analogo"], 1.2)
 
     if r["trajetorias"]:
         tj = r["trajetorias"]
+        # trajetórias deslocadas dos análogos, apenas após o dia D (fundo)
+        for ano, serie in tj["todas"].items():
+            _linha(fig, serie, datas, str(ano), CORES["analogo"], 1)
         _linha(fig, tj["maior_queda"], datas, f"Maior queda ({r['ano_maior_queda']})",
                CORES["maior"], 2, "dash", legenda=True)
         _linha(fig, tj["menor_queda"], datas, f"Menor queda ({r['ano_menor_queda']})",
@@ -80,6 +91,18 @@ def figura_estacao(doc: dict, resultado: dict) -> go.Figure:
                CORES["media"], 2, legenda=True)
     _linha(fig, doc["anos"][str(r["ano_atual"])], datas,
            f"Observado {r['ano_atual']}", CORES["observado"], 2.5, legenda=True)
+
+    # marcadores com valores: último dado e mínimos das 3 projeções
+    _marcador(fig, date.fromisoformat(r["dia_d"]), r["cota_atual"],
+              str(round(r["cota_atual"])), CORES["observado"], "top center")
+    if r["trajetorias"]:
+        tj = r["trajetorias"]
+        for serie, cor in ((tj["maior_queda"], CORES["maior"]),
+                           (tj["menor_queda"], CORES["menor"]),
+                           (tj["media"], CORES["media"])):
+            minimo, data_min = _minimo_trajetoria(serie, datas, r["idx_d"])
+            if minimo is not None:
+                _marcador(fig, data_min, minimo, str(round(minimo)), cor, "bottom center")
 
     dia_d = date.fromisoformat(r["dia_d"])
     fig.add_shape(type="line", x0=dia_d, x1=dia_d, y0=0, y1=1, yref="paper",
@@ -124,24 +147,27 @@ def gerar(caminho_saida: Path | None = None) -> Path:
             continue
         doc = json.loads(caminho.read_text(encoding="utf-8"))
         docs.append(doc)
-        resultados.append(analogia.calcular(doc, RANGE_DEFAULT, MODO_DEFAULT))
+        rng = analogia.range_inicial(doc)
+        resultados.append(analogia.calcular(doc, rng, MODO_DEFAULT))
 
     tmp_pdf = saida.with_suffix(".pdf.tmp")
     c = canvas.Canvas(str(tmp_pdf), pagesize=landscape(A4))
 
     # ---- capa ----
-    c.setFont("Helvetica-Bold", 24)
-    c.drawCentredString(largura_pg / 2, altura_pg - 45 * mm, "Projeções de cota por analogia")
+    c.setFont("Helvetica-Bold", 22)
+    c.drawCentredString(largura_pg / 2, altura_pg - 45 * mm,
+                        "Projeções de Nível — Estações-Chave para Hidrovias")
     c.setFont("Helvetica", 13)
     c.drawCentredString(largura_pg / 2, altura_pg - 56 * mm,
-                        "Série integrada (HIDRO consistido > bruto > telemetria) · cotas em cm")
+                        "Projeção por analogia · série integrada (HIDRO consistido > bruto > telemetria) · cotas em cm")
     c.drawCentredString(largura_pg / 2, altura_pg - 64 * mm,
-                        f"Gerado em {datetime.now():%d/%m/%Y %H:%M} · range da analogia: "
-                        f"±{RANGE_DEFAULT:.0f} cm (ajustável na versão web)")
+                        f"Gerado em {datetime.now():%d/%m/%Y %H:%M} · range por estação: "
+                        f"menor (≥10 cm) com pelo menos 3 anos análogos (ajustável na versão web)")
     y = altura_pg - 85 * mm
     c.setFont("Helvetica-Bold", 11)
-    colunas = [30 * mm, 105 * mm, 150 * mm, 190 * mm, 230 * mm]
-    for x, titulo in zip(colunas, ["Estação", "Rio", "Último dado", "Cota (cm)", "Anos análogos"]):
+    colunas = [25 * mm, 95 * mm, 135 * mm, 172 * mm, 207 * mm, 245 * mm]
+    for x, titulo in zip(colunas, ["Estação", "Rio", "Último dado", "Cota (cm)",
+                                   "Range (±cm)", "Anos análogos"]):
         c.drawString(x, y, titulo)
     c.setFont("Helvetica", 11)
     for doc, r in zip(docs, resultados):
@@ -149,7 +175,8 @@ def gerar(caminho_saida: Path | None = None) -> Path:
         ultima = datetime.fromisoformat(doc["ultima_data"])
         for x, texto in zip(colunas, [
             doc["nome"], doc.get("rio") or "—", f"{ultima:%d/%m/%Y}",
-            str(doc["ultimo_valor"]), str(len(r["selecionados"])),
+            str(doc["ultimo_valor"]), f"{r['range_valor']:.0f}",
+            str(len(r["selecionados"])),
         ]):
             c.drawString(x, y, texto)
     c.setFont("Helvetica", 9)

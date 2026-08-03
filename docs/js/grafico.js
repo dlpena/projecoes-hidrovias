@@ -52,24 +52,38 @@ const Grafico = (() => {
     return v === null || v === undefined ? "" : v.toFixed(casas).replace(".", ",");
   }
 
+  /** Mínimo (valor, data) de uma trajetória a partir do dia D. */
+  function minimoTrajetoria(serie, datas, idxD) {
+    let min = null, dataMin = null;
+    for (let i = idxD; i < 366; i++) {
+      if (datas[i] !== null && serie[i] !== null && serie[i] !== undefined) {
+        if (min === null || serie[i] < min) { min = serie[i]; dataMin = datas[i]; }
+      }
+    }
+    return { min, dataMin };
+  }
+
+  function marcador(x, y, texto, cor, posicao) {
+    return {
+      x: [x], y: [y], mode: "markers+text", text: [texto],
+      textposition: posicao, cliponaxis: false,
+      marker: { color: cor, size: 8 },
+      textfont: { size: 11, color: cor, family: "Segoe UI, system-ui, sans-serif" },
+      hoverinfo: "skip", showlegend: false,
+    };
+  }
+
   function montarTraces(doc, r) {
     const datas = datasDoAno(r.ano_atual);
-    const selecionados = new Set(r.selecionados);
     const traces = [];
 
-    // demais anos ao fundo, depois análogos por cima
-    for (const chave of Object.keys(doc.anos).sort()) {
-      const ano = parseInt(chave, 10);
-      if (ano === r.ano_atual || selecionados.has(ano)) continue;
-      traces.push(traceAno(doc.anos[chave], datas, String(ano), CORES.anoComum, 1, false));
-    }
-    for (const ano of r.selecionados) {
-      const t = traceAno(doc.anos[String(ano)], datas, String(ano), CORES.anoAnalogo, 1.2, true);
-      t.hovertemplate = `${ano} (análogo): %{y:.0f} cm<extra></extra>`;
-      traces.push(t);
-    }
-
+    // trajetórias deslocadas dos anos análogos, apenas após o dia D (fundo)
     if (r.trajetorias) {
+      for (const [ano, serie] of Object.entries(r.trajetorias.todas)) {
+        const t = traceAno(serie, datas, ano, CORES.anoAnalogo, 1, true);
+        t.hovertemplate = `${ano} (análogo): %{y:.0f} cm<extra></extra>`;
+        traces.push(t);
+      }
       const tj = r.trajetorias;
       const proj = [
         [tj.maior_queda, `Maior queda (${r.ano_maior_queda})`, CORES.maiorQueda, "dash"],
@@ -88,6 +102,23 @@ const Grafico = (() => {
                           `Observado ${r.ano_atual}`, CORES.observado, 2.5, true);
     tObs.showlegend = true;
     traces.push(tObs);
+
+    // marcadores com valores: último dado e mínimos das 3 projeções
+    traces.push(marcador(r.dia_d, r.cota_atual, String(Math.round(r.cota_atual)),
+                         CORES.observado, "top center"));
+    if (r.trajetorias) {
+      const tj = r.trajetorias;
+      for (const [serie, cor] of [
+        [tj.maior_queda, CORES.maiorQueda],
+        [tj.menor_queda, CORES.menorQueda],
+        [tj.media, CORES.media],
+      ]) {
+        const { min, dataMin } = minimoTrajetoria(serie, datas, r.idx_d);
+        if (min !== null) {
+          traces.push(marcador(dataMin, min, String(Math.round(min)), cor, "bottom center"));
+        }
+      }
+    }
     return { traces, datas };
   }
 
@@ -185,6 +216,133 @@ const Grafico = (() => {
     return L.join("\r\n");
   }
 
+  /** Abre a memória de cálculo formatada em nova janela e dispara a impressão
+   * (o usuário salva como PDF). Estrutura de leitura: parâmetros -> candidatos
+   * -> projeções -> série dia a dia. */
+  function abrirMemoriaPDF(doc, r) {
+    const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+    const datas = datasDoAno(r.ano_atual);
+    const obs = doc.anos[String(r.ano_atual)];
+    const tj = r.trajetorias;
+
+    const linhasCand = r.candidatos.map((c) => `
+      <tr class="${c.selecionado ? "sel" : ""}">
+        <td>${c.ano}</td>
+        <td>${esc((doc.fonte_por_ano || {})[String(c.ano)] || "")}</td>
+        <td class="n">${numeroBR(c.cota_em_d, 0)}</td>
+        <td class="n">${c.dias_tolerancia === null ? "" : c.dias_tolerancia}</td>
+        <td class="n">${c.cobertura === null ? "" : numeroBR(c.cobertura * 100, 0)}</td>
+        <td class="n">${numeroBR(c.min_pos_d, 0)}</td>
+        <td class="n">${numeroBR(c.delta, 0)}</td>
+        <td>${c.selecionado ? "<strong>sim</strong>" : "não"}</td>
+        <td>${esc(c.motivo || "")}</td>
+      </tr>`).join("");
+
+    let linhasProj = "";
+    if (tj) {
+      for (const [nome, serie, ano] of [
+        ["Maior queda", tj.maior_queda, r.ano_maior_queda],
+        ["Menor queda", tj.menor_queda, r.ano_menor_queda],
+        ["Média", tj.media, `${r.selecionados.length} anos`],
+      ]) {
+        const { min, dataMin } = minimoTrajetoria(serie, datas, r.idx_d);
+        linhasProj += `<tr><td>${nome}</td><td>${ano}</td>
+          <td class="n">${min === null ? "" : numeroBR(min, 0)}</td>
+          <td>${dataMin ? formatarDataBR(dataMin) : ""}</td></tr>`;
+      }
+    }
+
+    let linhasSerie = "";
+    for (let i = 0; i < 366; i++) {
+      if (datas[i] === null) continue;
+      const temObs = obs[i] !== null && obs[i] !== undefined;
+      const temProj = tj && i >= r.idx_d;
+      if (!temObs && !temProj) continue;
+      const interp = temProj && (tj.maior_queda_interp[i] || tj.menor_queda_interp[i]);
+      linhasSerie += `<tr><td>${formatarDataBR(datas[i])}</td>
+        <td class="n">${temObs ? numeroBR(obs[i], 0) : ""}</td>
+        <td class="n">${temProj ? numeroBR(tj.maior_queda[i]) : ""}</td>
+        <td class="n">${temProj ? numeroBR(tj.menor_queda[i]) : ""}</td>
+        <td class="n">${temProj ? numeroBR(tj.media[i]) : ""}</td>
+        <td>${interp ? "sim" : ""}</td></tr>`;
+    }
+
+    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
+<title>Memória de cálculo — ${esc(doc.nome)}</title>
+<style>
+  body { font-family: "Segoe UI", system-ui, sans-serif; color: #1a1a1a;
+         margin: 24px; font-size: 12px; line-height: 1.4; }
+  h1 { font-size: 18px; margin: 0 0 2px; }
+  h2 { font-size: 14px; margin: 18px 0 6px; border-bottom: 1px solid #ccc; padding-bottom: 3px; }
+  .meta { color: #555; margin: 0 0 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 6px 0; }
+  th, td { border: 1px solid #ddd; padding: 3px 7px; text-align: left; }
+  th { background: #f2f1ee; font-weight: 600; }
+  td.n { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.sel { background: #eef5fb; }
+  .nota { color: #777; font-size: 11px; }
+  @media print { body { margin: 10mm; } h2 { break-after: avoid; } tr { break-inside: avoid; } }
+</style></head><body>
+<h1>Memória de cálculo — projeção por analogia</h1>
+<p class="meta"><strong>${esc(doc.nome)}</strong> · rio ${esc(doc.rio || "—")} ·
+  HidroWeb ${doc.codigo_hidroweb} · equip. ${doc.estcodigo_telemetria} ·
+  gerado em ${new Date().toLocaleString("pt-BR")}</p>
+
+<h2>1. Parâmetros</h2>
+<table>
+  <tr><th>Dia D (último dado)</th><td>${formatarDataBR(r.dia_d)} (${esc(doc.fonte_ultimo_dado)})</td>
+      <th>Cota atual</th><td class="n">${numeroBR(r.cota_atual, 0)} cm</td></tr>
+  <tr><th>Range</th><td>±${numeroBR(r.range_valor)} ${r.modo === "cm" ? "cm" : "%"}
+      (equivale a ±${numeroBR(r.limite_cm)} cm)</td>
+      <th>Anos análogos</th><td class="n">${r.selecionados.length}</td></tr>
+</table>
+<p class="nota">Regras: cota do candidato no dia D com tolerância de ±3 dias (mais próximo
+primeiro; empate favorece o dia anterior); seleção se |cota − cota atual| ≤ range; exige-se
+≥80% de cobertura entre D e 31/dez e dado nos últimos 10 dias do ano; delta de queda =
+cota em D − mínimo pós-D; trajetórias deslocadas para coincidir com a cota atual em D;
+lacunas internas interpoladas linearmente (marcadas na seção 4).</p>
+${r.aviso ? `<p class="nota"><strong>Aviso:</strong> ${esc(r.aviso)}</p>` : ""}
+
+<h2>2. Universo de anos candidatos</h2>
+<table>
+  <tr><th>Ano</th><th>Fonte dos dados</th><th>Cota em D (cm)</th><th>Tolerância (dias)</th>
+      <th>Cobertura pós-D (%)</th><th>Mín. pós-D (cm)</th><th>Delta de queda (cm)</th>
+      <th>Selecionado</th><th>Motivo de exclusão</th></tr>
+  ${linhasCand}
+</table>
+
+<h2>3. Projeções resultantes</h2>
+${tj ? `<table>
+  <tr><th>Curva</th><th>Ano de referência</th><th>Mínimo projetado (cm)</th><th>Data do mínimo</th></tr>
+  ${linhasProj}
+</table>` : "<p class='nota'>Sem projeção (nenhum ano análogo no range).</p>"}
+
+<h2>4. Série dia a dia (${r.ano_atual})</h2>
+<table>
+  <tr><th>Data</th><th>Observado (cm)</th><th>Proj. maior queda (cm)</th>
+      <th>Proj. menor queda (cm)</th><th>Proj. média (cm)</th><th>Interpolado</th></tr>
+  ${linhasSerie}
+</table>
+<p class="nota">Fonte: data lake da ANA (banco HIDRO e telemetria) · série integrada
+(consistido &gt; bruto &gt; telemetria). Documento gerado no navegador — use
+"Salvar como PDF" na janela de impressão.</p>
+</body></html>`;
+
+    // iframe oculto + print(): não depende de pop-up (bloqueado em ambientes corporativos)
+    const anterior = document.getElementById("frame-memoria");
+    if (anterior) anterior.remove();
+    const frame = document.createElement("iframe");
+    frame.id = "frame-memoria";
+    frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
+    frame.addEventListener("load", () => {
+      if (window.__semImprimir) return; // usado nos testes automatizados
+      frame.contentWindow.focus();
+      frame.contentWindow.print();
+    });
+    document.body.appendChild(frame);
+    frame.srcdoc = html;
+  }
+
   function baixarCSV(nomeArquivo, conteudo) {
     const blob = new Blob(["﻿" + conteudo], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
@@ -215,7 +373,10 @@ const Grafico = (() => {
           <button type="button" class="ctl-pct">± %</button>
         </span>
         <span>Anos análogos: <span class="contagem">–</span></span>
-        <button type="button" class="botao-csv">Baixar CSV (memória de cálculo)</button>
+        <span class="acoes">
+          <button type="button" class="botao-csv botao-memoria">Memória de cálculo (PDF)</button>
+          <button type="button" class="botao-csv botao-sec">CSV</button>
+        </span>
       </div>
       <p class="aviso"></p>
       <div class="grafico"></div>
@@ -232,9 +393,15 @@ const Grafico = (() => {
       aviso: sec.querySelector(".aviso"),
       grafico: sec.querySelector(".grafico"),
       rodape: sec.querySelector(".estacao-rodape"),
-      csv: sec.querySelector(".botao-csv"),
+      memoria: sec.querySelector(".botao-memoria"),
+      csv: sec.querySelector(".botao-sec"),
     };
-    const estado = { range: 10, modo: "cm", resultado: null };
+    // range inicial: o menor (≥10 cm) que contém pelo menos 3 anos análogos
+    const rangeAuto = Analogia.rangeInicial(doc);
+    const estado = { range: rangeAuto, modo: "cm", resultado: null };
+    if (rangeAuto > 100) el.slider.max = String(Math.ceil(rangeAuto * 2));
+    el.slider.value = String(rangeAuto);
+    el.num.value = String(rangeAuto);
 
     function render() {
       const r = Analogia.calcular(doc, estado.range, estado.modo);
@@ -271,15 +438,19 @@ const Grafico = (() => {
       el.btnCm.classList.toggle("ativo", modo === "cm");
       el.btnPct.classList.toggle("ativo", modo === "pct");
       el.unidade.textContent = modo === "cm" ? "cm" : "%";
-      const padrao = modo === "cm" ? 10 : 2;
+      const padrao = modo === "cm" ? rangeAuto : 2;
       estado.range = padrao;
+      el.slider.max = modo === "cm" ? String(Math.max(100, Math.ceil(rangeAuto * 2))) : "20";
       el.slider.value = String(padrao);
-      el.slider.max = modo === "cm" ? "100" : "20";
       el.num.value = String(padrao);
       render();
     }
     el.btnCm.addEventListener("click", () => trocarModo("cm"));
     el.btnPct.addEventListener("click", () => trocarModo("pct"));
+    el.memoria.addEventListener("click", () => {
+      const r = estado.resultado || Analogia.calcular(doc, estado.range, estado.modo);
+      abrirMemoriaPDF(doc, r);
+    });
     el.csv.addEventListener("click", () => {
       const r = estado.resultado || Analogia.calcular(doc, estado.range, estado.modo);
       baixarCSV(`analogia_${doc.slug}_${doc.ultima_data}.csv`, gerarCSV(doc, r));
