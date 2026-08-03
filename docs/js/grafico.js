@@ -134,11 +134,11 @@ const Grafico = (() => {
       const proj = [
         [tj.maior_queda,
          `Maior queda (${r.ano_maior_queda}${rotuloQueda(r, r.ano_maior_queda)})`,
-         CORES.maiorQueda, "dash"],
+         CORES.maiorQueda, "solid"],
         [tj.menor_queda,
          `Menor queda (${r.ano_menor_queda}${rotuloQueda(r, r.ano_menor_queda)})`,
-         CORES.menorQueda, "dash"],
-        [tj.media, `Média (${r.selecionados.length} anos)`, CORES.media, "solid"],
+         CORES.menorQueda, "solid"],
+        [tj.media, `Média (${r.selecionados.length} anos)`, CORES.media, "dot"],
       ];
       for (const [serie, nome, cor, traco] of proj) {
         const t = traceAno(serie, datas, nome, cor, 2, true);
@@ -215,10 +215,9 @@ const Grafico = (() => {
 
   const CONFIG = {
     responsive: true,
-    displaylogo: false,
-    locale: "pt-BR",
-    modeBarButtonsToRemove: ["lasso2d", "select2d", "autoScale2d"],
-    toImageButtonOptions: { format: "png", width: 1600, height: 800, scale: 2 },
+    displayModeBar: false,   // sem comandos de manipulação (zoom, pan etc.)
+    scrollZoom: false,
+    doubleClick: false,
   };
 
   function gerarCSV(doc, r) {
@@ -360,15 +359,24 @@ const Grafico = (() => {
       agendarRender();
     });
     function trocarModo(modo) {
+      if (modo === estado.modo) return;
+      // mantém o range equivalente ao trocar de unidade (cm <-> % da cota atual)
+      const r = estado.resultado || Analogia.calcular(doc, estado.range, estado.modo);
+      const cota = Math.abs(r.cota_atual) || 1;
+      const novo = modo === "pct"
+        ? Math.round((estado.range / cota) * 1000) / 10   // cm -> %, 1 casa decimal
+        : Math.max(1, Math.round((cota * estado.range) / 100));  // % -> cm
       estado.modo = modo;
+      estado.range = novo;
       el.btnCm.classList.toggle("ativo", modo === "cm");
       el.btnPct.classList.toggle("ativo", modo === "pct");
       el.unidade.textContent = modo === "cm" ? "cm" : "%";
-      const padrao = modo === "cm" ? rangeAuto : 2;
-      estado.range = padrao;
-      el.slider.max = modo === "cm" ? String(Math.max(100, Math.ceil(rangeAuto * 2))) : "20";
-      el.slider.value = String(padrao);
-      el.num.value = String(padrao);
+      el.slider.step = modo === "cm" ? "1" : "0.1";
+      el.slider.max = modo === "cm"
+        ? String(Math.max(100, Math.ceil(rangeAuto * 2), Math.ceil(novo)))
+        : String(Math.max(20, Math.ceil(novo * 2)));
+      el.slider.value = String(novo);
+      el.num.value = String(novo);
       render();
     }
     el.btnCm.addEventListener("click", () => trocarModo("cm"));
