@@ -55,6 +55,43 @@ def _linha(fig, serie, datas, nome, cor, largura, tracejado=None, legenda=False)
     ))
 
 
+def _rotulo_queda(r: dict, ano: int) -> str:
+    c = next((c for c in r["candidatos"] if c["ano"] == ano), None)
+    if c is None or c["delta"] is None:
+        return ""
+    if c["delta"] >= 0:
+        return f" · queda {round(c['delta'])} cm"
+    return f" · subida {round(-c['delta'])} cm"
+
+
+def _faixa_y(doc: dict, r: dict) -> float:
+    valores = []
+
+    def varre(serie):
+        valores.extend(v for v in serie if v is not None)
+
+    varre(doc["anos"][str(r["ano_atual"])])
+    if r["trajetorias"]:
+        for serie in r["trajetorias"]["todas"].values():
+            varre(serie)
+        varre(r["trajetorias"]["maior_queda"])
+        varre(r["trajetorias"]["menor_queda"])
+    return (max(valores) - min(valores)) if len(valores) > 1 else 1.0
+
+
+def _posicionar_rotulos(minimos: list, amplitude_y: float) -> list:
+    """Espelho de posicionarRotulos (grafico.js): evita rótulos sobrepostos."""
+    lim_y = amplitude_y * 0.07
+    pos = ["bottom center"] * len(minimos)
+    for i in range(len(minimos)):
+        for j in range(i + 1, len(minimos)):
+            d_dias = abs((minimos[i][0] - minimos[j][0]).days)
+            if d_dias < 20 and abs(minimos[i][1] - minimos[j][1]) < lim_y:
+                cima = i if minimos[i][1] >= minimos[j][1] else j
+                pos[cima] = "middle right" if pos[cima] == "top center" else "top center"
+    return pos
+
+
 def _minimo_trajetoria(serie: list, datas: list, idx_d: int) -> tuple:
     minimo, data_min = None, None
     for i in range(idx_d, 366):
@@ -83,9 +120,11 @@ def figura_estacao(doc: dict, resultado: dict) -> go.Figure:
         # trajetórias deslocadas dos análogos, apenas após o dia D (fundo)
         for ano, serie in tj["todas"].items():
             _linha(fig, serie, datas, str(ano), CORES["analogo"], 1)
-        _linha(fig, tj["maior_queda"], datas, f"Maior queda ({r['ano_maior_queda']})",
+        _linha(fig, tj["maior_queda"], datas,
+               f"Maior queda ({r['ano_maior_queda']}{_rotulo_queda(r, r['ano_maior_queda'])})",
                CORES["maior"], 2, "dash", legenda=True)
-        _linha(fig, tj["menor_queda"], datas, f"Menor queda ({r['ano_menor_queda']})",
+        _linha(fig, tj["menor_queda"], datas,
+               f"Menor queda ({r['ano_menor_queda']}{_rotulo_queda(r, r['ano_menor_queda'])})",
                CORES["menor"], 2, "dash", legenda=True)
         _linha(fig, tj["media"], datas, f"Média ({len(r['selecionados'])} anos)",
                CORES["media"], 2, legenda=True)
@@ -97,12 +136,16 @@ def figura_estacao(doc: dict, resultado: dict) -> go.Figure:
               str(round(r["cota_atual"])), CORES["observado"], "top center")
     if r["trajetorias"]:
         tj = r["trajetorias"]
+        minimos = []
         for serie, cor in ((tj["maior_queda"], CORES["maior"]),
                            (tj["menor_queda"], CORES["menor"]),
                            (tj["media"], CORES["media"])):
             minimo, data_min = _minimo_trajetoria(serie, datas, r["idx_d"])
             if minimo is not None:
-                _marcador(fig, data_min, minimo, str(round(minimo)), cor, "bottom center")
+                minimos.append((data_min, minimo, cor))
+        posicoes = _posicionar_rotulos(minimos, _faixa_y(doc, r))
+        for (data_min, minimo, cor), pos in zip(minimos, posicoes):
+            _marcador(fig, data_min, minimo, str(round(minimo)), cor, pos)
 
     dia_d = date.fromisoformat(r["dia_d"])
     fig.add_shape(type="line", x0=dia_d, x1=dia_d, y0=0, y1=1, yref="paper",

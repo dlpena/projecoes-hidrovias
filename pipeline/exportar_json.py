@@ -30,7 +30,42 @@ def _gravar_atomico(caminho: Path, conteudo: str) -> None:
     os.replace(tmp, caminho)
 
 
-def exportar_estacao(estacao: dict, integrada: pd.DataFrame) -> dict:
+def _dias_no_ano(ano: int) -> int:
+    return pd.Timestamp(ano, 12, 31).dayofyear
+
+
+def _cobertura_anual(datas: pd.Series) -> dict[str, int]:
+    """% de dias com dado por ano: {'1968': 97, ...} (anos sem dado ficam fora)."""
+    if datas is None or len(datas) == 0:
+        return {}
+    datas = pd.to_datetime(datas).dt.normalize().drop_duplicates()
+    contagem = datas.dt.year.value_counts().sort_index()
+    return {
+        str(ano): min(100, round(100 * n / _dias_no_ano(int(ano))))
+        for ano, n in contagem.items()
+    }
+
+
+def cobertura_fontes(df_hidro: pd.DataFrame | None,
+                     df_tele: pd.DataFrame | None) -> dict:
+    """Cobertura anual por fonte, ANTES da integração (para auditoria).
+
+    Telemetria: o pipeline só consulta a janela recente (o histórico coberto
+    pelo HIDRO não é re-buscado), então a cobertura dela só aparece nos anos
+    consultados.
+    """
+    fontes: dict[str, dict] = {}
+    if df_hidro is not None and not df_hidro.empty:
+        fontes["consistido"] = _cobertura_anual(df_hidro.loc[df_hidro["nivel"] == 2, "data"])
+        fontes["bruto"] = _cobertura_anual(df_hidro.loc[df_hidro["nivel"] == 1, "data"])
+    if df_tele is not None and not df_tele.empty:
+        fontes["telemetria"] = _cobertura_anual(df_tele["HORDATAHORA"])
+    return {f: c for f, c in fontes.items() if c}
+
+
+def exportar_estacao(estacao: dict, integrada: pd.DataFrame,
+                     df_hidro: pd.DataFrame | None = None,
+                     df_tele: pd.DataFrame | None = None) -> dict:
     """Grava docs/dados/{slug}.json e retorna o resumo para o indice.json."""
     anos: dict[str, list] = {}
     fontes_por_ano: dict[str, set] = {}
@@ -57,6 +92,7 @@ def exportar_estacao(estacao: dict, integrada: pd.DataFrame) -> dict:
         "fonte_por_ano": {
             ano: "+".join(sorted(f)) for ano, f in sorted(fontes_por_ano.items())
         },
+        "cobertura_fontes": cobertura_fontes(df_hidro, df_tele),
         "anos": {ano: anos[ano] for ano in sorted(anos)},
     }
     caminho = DIR_DADOS_SITE / f"{estacao['slug']}.json"

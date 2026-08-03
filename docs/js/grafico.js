@@ -73,6 +73,52 @@ const Grafico = (() => {
     };
   }
 
+  /** Rótulo da queda para a legenda: " · queda 191 cm" (ou "subida" se negativa). */
+  function rotuloQueda(r, ano) {
+    const c = r.candidatos.find((c) => c.ano === ano);
+    if (!c || c.delta === null) return "";
+    return c.delta >= 0
+      ? ` · queda ${Math.round(c.delta)} cm`
+      : ` · subida ${Math.round(-c.delta)} cm`;
+  }
+
+  /** Amplitude vertical dos dados plotados (para calibrar a anticolisão). */
+  function faixaY(doc, r) {
+    let min = Infinity, max = -Infinity;
+    const varre = (serie) => {
+      for (let i = 0; i < 366; i++) {
+        const v = serie[i];
+        if (v !== null && v !== undefined) {
+          if (v < min) min = v;
+          if (v > max) max = v;
+        }
+      }
+    };
+    varre(doc.anos[String(r.ano_atual)]);
+    if (r.trajetorias) {
+      Object.values(r.trajetorias.todas).forEach(varre);
+      varre(r.trajetorias.maior_queda);
+      varre(r.trajetorias.menor_queda);
+    }
+    return max > min ? max - min : 1;
+  }
+
+  /** Posições de texto dos mínimos, evitando rótulos sobrepostos. */
+  function posicionarRotulos(minimos, amplitudeY) {
+    const limY = amplitudeY * 0.07;
+    const pos = minimos.map(() => "bottom center");
+    for (let i = 0; i < minimos.length; i++) {
+      for (let j = i + 1; j < minimos.length; j++) {
+        const dDias = Math.abs(new Date(minimos[i].x) - new Date(minimos[j].x)) / 864e5;
+        if (dDias < 20 && Math.abs(minimos[i].y - minimos[j].y) < limY) {
+          const cima = minimos[i].y >= minimos[j].y ? i : j;
+          pos[cima] = pos[cima] === "top center" ? "middle right" : "top center";
+        }
+      }
+    }
+    return pos;
+  }
+
   function montarTraces(doc, r) {
     const datas = datasDoAno(r.ano_atual);
     const traces = [];
@@ -86,8 +132,12 @@ const Grafico = (() => {
       }
       const tj = r.trajetorias;
       const proj = [
-        [tj.maior_queda, `Maior queda (${r.ano_maior_queda})`, CORES.maiorQueda, "dash"],
-        [tj.menor_queda, `Menor queda (${r.ano_menor_queda})`, CORES.menorQueda, "dash"],
+        [tj.maior_queda,
+         `Maior queda (${r.ano_maior_queda}${rotuloQueda(r, r.ano_maior_queda)})`,
+         CORES.maiorQueda, "dash"],
+        [tj.menor_queda,
+         `Menor queda (${r.ano_menor_queda}${rotuloQueda(r, r.ano_menor_queda)})`,
+         CORES.menorQueda, "dash"],
         [tj.media, `Média (${r.selecionados.length} anos)`, CORES.media, "solid"],
       ];
       for (const [serie, nome, cor, traco] of proj) {
@@ -108,16 +158,19 @@ const Grafico = (() => {
                          CORES.observado, "top center"));
     if (r.trajetorias) {
       const tj = r.trajetorias;
+      const minimos = [];
       for (const [serie, cor] of [
         [tj.maior_queda, CORES.maiorQueda],
         [tj.menor_queda, CORES.menorQueda],
         [tj.media, CORES.media],
       ]) {
         const { min, dataMin } = minimoTrajetoria(serie, datas, r.idx_d);
-        if (min !== null) {
-          traces.push(marcador(dataMin, min, String(Math.round(min)), cor, "bottom center"));
-        }
+        if (min !== null) minimos.push({ x: dataMin, y: min, cor });
       }
+      const posicoes = posicionarRotulos(minimos, faixaY(doc, r));
+      minimos.forEach((m, i) => {
+        traces.push(marcador(m.x, m.y, String(Math.round(m.y)), m.cor, posicoes[i]));
+      });
     }
     return { traces, datas };
   }
@@ -216,9 +269,64 @@ const Grafico = (() => {
     return L.join("\r\n");
   }
 
+  /** Cor da célula do heatmap de cobertura: 0% vermelho -> 50% amarelo -> 100% verde. */
+  function corCobertura(pct) {
+    const mistura = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+    const vermelho = [192, 57, 43], amarelo = [232, 195, 75], verde = [46, 125, 50];
+    const rgb = pct <= 50
+      ? mistura(vermelho, amarelo, pct / 50)
+      : mistura(amarelo, verde, (pct - 50) / 50);
+    return `rgb(${rgb.join(",")})`;
+  }
+
+  /** Heatmap HTML (1 célula por ano) da cobertura por fonte, para a memória. */
+  function heatmapCobertura(doc) {
+    const cf = doc.cobertura_fontes;
+    if (!cf || !Object.keys(cf).length) return "";
+    const ROTULOS = {
+      consistido: "HIDRO consistido", bruto: "HIDRO bruto", telemetria: "Telemetria",
+    };
+    let anoMin = Infinity, anoMax = -Infinity;
+    for (const cob of Object.values(cf)) {
+      for (const a of Object.keys(cob)) {
+        const ano = parseInt(a, 10);
+        if (ano < anoMin) anoMin = ano;
+        if (ano > anoMax) anoMax = ano;
+      }
+    }
+    const anos = [];
+    for (let a = anoMin; a <= anoMax; a++) anos.push(a);
+
+    let linhas = "";
+    for (const fonte of ["consistido", "bruto", "telemetria"]) {
+      const cob = cf[fonte];
+      if (!cob) continue;
+      const celulas = anos.map((a) => {
+        const pct = cob[String(a)];
+        const estilo = pct === undefined ? "" : `background:${corCobertura(pct)}`;
+        const titulo = pct === undefined ? `${a}: sem dado` : `${a}: ${pct}% dos dias`;
+        return `<div class="hm-cel" style="${estilo}" title="${titulo}"></div>`;
+      }).join("");
+      linhas += `<div class="hm-linha"><span class="hm-rotulo">${ROTULOS[fonte]}</span>
+        <div class="hm-celulas">${celulas}</div></div>`;
+    }
+    const eixo = anos.map((a) =>
+      `<div class="hm-cel hm-eixo">${a % 10 === 0 ? a : ""}</div>`).join("");
+    return `
+<h2>2. Cobertura por fonte da série integrada</h2>
+<div class="heatmap">
+  ${linhas}
+  <div class="hm-linha"><span class="hm-rotulo"></span><div class="hm-celulas">${eixo}</div></div>
+</div>
+<p class="nota">Cor = % de dias do ano com dado na fonte (verde 100% · amarelo 50% ·
+vermelho 0%; branco = sem dado). A série integrada usa, dia a dia, a fonte de maior
+prioridade disponível (consistido &gt; bruto &gt; telemetria). A telemetria é consultada
+apenas na janela recente ainda não coberta pelo histórico congelado do HIDRO.</p>`;
+  }
+
   /** Abre a memória de cálculo formatada em nova janela e dispara a impressão
-   * (o usuário salva como PDF). Estrutura de leitura: parâmetros -> candidatos
-   * -> projeções -> série dia a dia. */
+   * (o usuário salva como PDF). Estrutura de leitura: parâmetros -> cobertura
+   * -> candidatos -> projeções -> série dia a dia. */
   function abrirMemoriaPDF(doc, r) {
     const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
     const datas = datasDoAno(r.ano_atual);
@@ -246,9 +354,11 @@ const Grafico = (() => {
         ["Média", tj.media, `${r.selecionados.length} anos`],
       ]) {
         const { min, dataMin } = minimoTrajetoria(serie, datas, r.idx_d);
+        const queda = min === null ? null : r.cota_atual - min;
         linhasProj += `<tr><td>${nome}</td><td>${ano}</td>
           <td class="n">${min === null ? "" : numeroBR(min, 0)}</td>
-          <td>${dataMin ? formatarDataBR(dataMin) : ""}</td></tr>`;
+          <td>${dataMin ? formatarDataBR(dataMin) : ""}</td>
+          <td class="n">${queda === null ? "" : numeroBR(queda, 0)}</td></tr>`;
       }
     }
 
@@ -281,6 +391,14 @@ const Grafico = (() => {
   td.n { text-align: right; font-variant-numeric: tabular-nums; }
   tr.sel { background: #eef5fb; }
   .nota { color: #777; font-size: 11px; }
+  .heatmap { margin: 8px 0 2px; }
+  .hm-linha { display: flex; align-items: center; margin-bottom: 2px; }
+  .hm-rotulo { width: 110px; flex: none; font-size: 11px; color: #555; padding-right: 6px; }
+  .hm-celulas { display: flex; flex: 1; gap: 0; }
+  .hm-cel { flex: 1; height: 14px; background: #fff;
+            print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .hm-eixo { height: 12px; font-size: 8px; color: #777; overflow: visible;
+             white-space: nowrap; text-align: left; }
   @media print { body { margin: 10mm; } h2 { break-after: avoid; } tr { break-inside: avoid; } }
 </style></head><body>
 <h1>Memória de cálculo — projeção por analogia</h1>
@@ -302,8 +420,9 @@ primeiro; empate favorece o dia anterior); seleção se |cota − cota atual| �
 cota em D − mínimo pós-D; trajetórias deslocadas para coincidir com a cota atual em D;
 lacunas internas interpoladas linearmente (marcadas na seção 4).</p>
 ${r.aviso ? `<p class="nota"><strong>Aviso:</strong> ${esc(r.aviso)}</p>` : ""}
+${heatmapCobertura(doc)}
 
-<h2>2. Universo de anos candidatos</h2>
+<h2>3. Universo de anos candidatos</h2>
 <table>
   <tr><th>Ano</th><th>Fonte dos dados</th><th>Cota em D (cm)</th><th>Tolerância (dias)</th>
       <th>Cobertura pós-D (%)</th><th>Mín. pós-D (cm)</th><th>Delta de queda (cm)</th>
@@ -311,13 +430,14 @@ ${r.aviso ? `<p class="nota"><strong>Aviso:</strong> ${esc(r.aviso)}</p>` : ""}
   ${linhasCand}
 </table>
 
-<h2>3. Projeções resultantes</h2>
+<h2>4. Projeções resultantes</h2>
 ${tj ? `<table>
-  <tr><th>Curva</th><th>Ano de referência</th><th>Mínimo projetado (cm)</th><th>Data do mínimo</th></tr>
+  <tr><th>Curva</th><th>Ano de referência</th><th>Mínimo projetado (cm)</th><th>Data do mínimo</th>
+      <th>Queda desde a cota atual (cm)</th></tr>
   ${linhasProj}
 </table>` : "<p class='nota'>Sem projeção (nenhum ano análogo no range).</p>"}
 
-<h2>4. Série dia a dia (${r.ano_atual})</h2>
+<h2>5. Série dia a dia (${r.ano_atual})</h2>
 <table>
   <tr><th>Data</th><th>Observado (cm)</th><th>Proj. maior queda (cm)</th>
       <th>Proj. menor queda (cm)</th><th>Proj. média (cm)</th><th>Interpolado</th></tr>

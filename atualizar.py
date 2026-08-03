@@ -98,7 +98,7 @@ def main() -> int:
                 integrada = integrar.serie_integrada(df_hidro, df_tele)
                 if integrada.empty:
                     raise RuntimeError("série integrada vazia")
-                resumos.append(exportar_json.exportar_estacao(est, integrada))
+                resumos.append(exportar_json.exportar_estacao(est, integrada, df_hidro, df_tele))
                 log.info("%s: JSON exportado (última data %s)", est["slug"], resumos[-1]["ultima_data"])
             except Exception:
                 log.exception("%s: falha — mantendo JSON anterior", est["slug"])
