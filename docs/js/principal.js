@@ -11,6 +11,12 @@
     return d.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
   }
 
+  // ajuda (Como funciona?) — independe do carregamento dos dados
+  const ajuda = document.getElementById("ajuda");
+  document.getElementById("btn-ajuda").addEventListener("click", () => ajuda.showModal());
+  document.getElementById("btn-fechar-ajuda").addEventListener("click", () => ajuda.close());
+  ajuda.addEventListener("click", (e) => { if (e.target === ajuda) ajuda.close(); });
+
   try {
     const resp = await fetch("dados/indice.json", { cache: "no-cache" });
     if (!resp.ok) throw new Error(`indice.json: HTTP ${resp.status}`);

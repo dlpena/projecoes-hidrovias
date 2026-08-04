@@ -111,7 +111,7 @@ const ExportarPDF = (() => {
       body: [
         ["Dia D (último dado)", `${dataD} (${docE.fonte_ultimo_dado})`,
          "Cota atual", `${fmt(r.cota_atual, 0)} cm`],
-        ["Range (o visualizado)", t(`${rotuloRange(r)} (equivale a ±${fmt(r.limite_cm)} cm)`),
+        ["Intervalo (cota atual ±)", t(`${rotuloRange(r)} — o ajustado na tela (equivale a ±${fmt(r.limite_cm)} cm)`),
          "Anos análogos", String(r.selecionados.length)],
       ],
       columnStyles: { 0: { fontStyle: "bold", cellWidth: 40 }, 2: { fontStyle: "bold", cellWidth: 30 } },
@@ -123,7 +123,7 @@ const ExportarPDF = (() => {
       "de cobertura entre D e 31/dez e dado nos últimos 10 dias do ano; delta de queda = cota " +
       "em D − mínimo pós-D; trajetórias deslocadas para coincidir com a cota atual em D; " +
       "lacunas internas interpoladas linearmente (marcadas na seção 5). Este documento reflete " +
-      "o range ajustado na tela no momento da exportação.", y, largura);
+      "o intervalo ajustado na tela no momento da exportação.", y, largura);
     if (r.aviso) y = nota(pdf, `Aviso: ${r.aviso}`, y, largura);
 
     y = tituloSecao(pdf, "2. Cobertura por fonte da série integrada", y + 1);
@@ -240,7 +240,7 @@ const ExportarPDF = (() => {
     pdf.setFont("helvetica", "normal").setFontSize(11).setTextColor(60);
     pdf.text(t("Projeção por analogia · série integrada (HIDRO consistido > bruto > telemetria) · cotas em cm"),
              larguraPg / 2, 54, { align: "center" });
-    pdf.text(t(`Gerado do site em ${new Date().toLocaleString("pt-BR")} — com os ranges ajustados na tela`),
+    pdf.text(t(`Gerado do site em ${new Date().toLocaleString("pt-BR")} — com os intervalos ajustados na tela`),
              larguraPg / 2, 61, { align: "center" });
 
     const corpo = registros.map(({ doc, resultado }) => [
@@ -251,7 +251,7 @@ const ExportarPDF = (() => {
     pdf.autoTable({
       ...GRADE, startY: 75,
       styles: { ...GRADE.styles, fontSize: 9, cellPadding: 1.8 },
-      head: [["Estação", "Rio", "Último dado", "Cota (cm)", "Range (visualizado)", "Anos análogos"]],
+      head: [["Estação", "Rio", "Último dado", "Cota (cm)", "Intervalo (cota atual ±)", "Anos análogos"]],
       body: corpo,
       columnStyles: { 3: { halign: "right" }, 5: { halign: "right" } },
       margin: { left: 60, right: 60 },
@@ -268,7 +268,7 @@ const ExportarPDF = (() => {
       pdf.setFont("helvetica", "normal").setFontSize(9).setTextColor(85);
       pdf.text(t(`rio ${doc.rio || "—"} · HidroWeb ${doc.codigo_hidroweb} · equip. ${doc.estcodigo_telemetria} · ` +
                  `último dado ${doc.ultima_data.split("-").reverse().join("/")} (${doc.ultimo_valor} cm, ` +
-                 `${doc.fonte_ultimo_dado}) · range ${rotuloRange(resultado)}`),
+                 `${doc.fonte_ultimo_dado}) · intervalo ${rotuloRange(resultado)}`),
                MARGEM, MARGEM + 8);
       const altura = larguraUtil * 680 / 1400;
       pdf.addImage(png, "PNG", MARGEM, MARGEM + 12, larguraUtil, altura);

@@ -17,22 +17,91 @@
       <nav id="nav-estacoes" class="nav-estacoes"></nav>
       <div class="topo-meta">
         <span id="carimbo">Carregando…</span>
+        <button id="btn-ajuda" type="button" title="Como as projeções são calculadas">Como funciona?</button>
         <button id="btn-pdf-conjunto" type="button" disabled
-                title="PDF com os 6 gráficos exatamente como estão na tela (ranges ajustados)">Baixar PDF do conjunto</button>
+                title="PDF com os 6 gráficos exatamente como estão na tela (intervalos ajustados)">Baixar PDF do conjunto</button>
       </div>
     </div>
   </header>
 
   <main id="conteudo"></main>
 
+  <dialog id="ajuda">
+    <div class="ajuda-cabecalho">
+      <h2>Como as projeções são calculadas</h2>
+      <button id="btn-fechar-ajuda" type="button" aria-label="Fechar">✕</button>
+    </div>
+    <div class="ajuda-corpo">
+      <h3>A ideia em uma frase</h3>
+      <p>Olhamos como o rio se comportou, <strong>em anos passados parecidos com o atual</strong>,
+      daqui até o fim do ano — e mostramos o pior caso, o melhor caso e o caso médio.</p>
+
+      <h3>Passo a passo</h3>
+      <ol>
+        <li><strong>Onde estamos hoje.</strong> A linha preta é a cota observada no ano atual,
+        até o último dado disponível (o ponto preto com o valor, marcado pela linha vertical
+        pontilhada).</li>
+        <li><strong>Procurar anos parecidos.</strong> Voltamos ao histórico e perguntamos: em
+        que anos, <em>neste mesmo dia do calendário</em>, o rio estava com cota próxima da
+        atual? "Próxima" significa dentro do <strong>Intervalo</strong> que você controla —
+        por exemplo, ±10 cm quer dizer até 10 cm acima ou abaixo da cota atual. Esses são os
+        <strong>anos análogos</strong> (listados abaixo de cada gráfico).</li>
+        <li><strong>Ver o que aconteceu depois.</strong> Para cada ano análogo, pegamos a
+        trajetória da cota daquele dia até 31/dez e medimos a queda até o mínimo. Essas
+        trajetórias aparecem em cinza-claro, deslocadas para começar exatamente na cota atual
+        — assim todas partem do mesmo ponto e ficam comparáveis.</li>
+        <li><strong>As três curvas.</strong>
+          <span class="cor-maior">■</span> <strong>Maior queda</strong>: o ano análogo em que o
+          rio mais desceu (cenário mais severo).
+          <span class="cor-menor">■</span> <strong>Menor queda</strong>: o ano em que menos
+          desceu (cenário mais favorável).
+          <span class="cor-media">■</span> <strong>Média</strong> (pontilhada): a média, dia a
+          dia, de todos os anos análogos. Os pontos coloridos marcam o mínimo de cada curva,
+          com o valor em cm.</li>
+      </ol>
+
+      <h3>O Intervalo — e por que ele importa</h3>
+      <p>Intervalo pequeno = anos muito parecidos com o atual, porém poucos; intervalo grande =
+      mais anos, porém menos parecidos. Cada gráfico abre com o menor intervalo (a partir de
+      ±10 cm) que garante <strong>pelo menos 3 anos análogos</strong>. Você pode ajustá-lo em
+      cm ou em % da cota atual — ao trocar a unidade, o valor é convertido, sem mudar a seleção.
+      Mexa no controle e veja a sensibilidade: o número de anos análogos e as curvas se
+      atualizam na hora.</p>
+
+      <h3>Cuidados com a qualidade dos dados</h3>
+      <ul>
+        <li>Se um ano não tem medição exatamente naquele dia, usamos o dado mais próximo em até
+        3 dias.</li>
+        <li>Anos com muitas falhas depois do dia de referência ficam de fora: exigimos pelo
+        menos 80% dos dias com dado até 31/dez e alguma medição nos últimos 10 dias do ano.</li>
+        <li>Cada dia usa a melhor fonte disponível: dado consistido do HIDRO &gt; dado bruto &gt;
+        telemetria (a memória de cálculo mostra a cobertura de cada fonte).</li>
+      </ul>
+
+      <h3>Como ler (e como não ler)</h3>
+      <p>Isto <strong>não é uma previsão meteorológica</strong>: é uma projeção por analogia —
+      "se este ano se comportar como os anos parecidos, a cota deve ficar entre a curva laranja
+      e a azul, com a pontilhada como referência central". Chuvas fora do padrão histórico podem
+      levar o rio para fora dessa faixa. Nos rios de vazante tardia (Paraguai), o mínimo real
+      pode ocorrer depois de 31/dez, além do horizonte do gráfico.</p>
+
+      <h3>Exportações</h3>
+      <p>O PDF do conjunto, a memória de cálculo (PDF) e o CSV são gerados na hora, refletindo
+      exatamente o que está na tela — incluindo o intervalo que você ajustou. A memória de
+      cálculo lista todos os anos candidatos com o motivo de cada inclusão ou exclusão, para
+      auditoria completa.</p>
+    </div>
+  </dialog>
+
   <footer class="rodape">
     <p>Metodologia: a partir do último dado do ano corrente (dia D), são selecionados os anos
-    históricos cuja cota no mesmo dia/mês está dentro do range escolhido (tolerância de ±3 dias
-    quando falta o dado exato; exige-se ≥80% de cobertura entre D e 31/dez e dado nos últimos
-    10 dias do ano). As trajetórias projetadas são as dos anos de maior e menor queda até 31/dez
-    e a média de todos os análogos, deslocadas para coincidir com a cota atual no dia D; as
-    curvas cinzas são as trajetórias deslocadas de todos os anos análogos. O range inicial de
-    cada gráfico é o menor (≥10 cm) que contém pelo menos 3 anos análogos.
+    históricos cuja cota no mesmo dia/mês está dentro do intervalo escolhido em torno da cota
+    atual (tolerância de ±3 dias quando falta o dado exato; exige-se ≥80% de cobertura entre D
+    e 31/dez e dado nos últimos 10 dias do ano). As trajetórias projetadas são as dos anos de
+    maior e menor queda até 31/dez e a média de todos os análogos, deslocadas para coincidir
+    com a cota atual no dia D; as curvas cinzas são as trajetórias deslocadas de todos os anos
+    análogos. O intervalo inicial de cada gráfico é o menor (≥10 cm) que contém pelo menos
+    3 anos análogos. Detalhes no botão "Como funciona?".
     Fonte: data lake da ANA (banco HIDRO e telemetria).</p>
   </footer>
 

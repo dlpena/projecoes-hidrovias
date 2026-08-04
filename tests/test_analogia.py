@@ -56,7 +56,7 @@ def test_fora_do_range_cm_e_pct():
     }
     r = analogia.calcular(doc_base(anos), 10, "cm")
     m = {c["ano"]: c["motivo"] for c in r["candidatos"]}
-    assert m[2001] == "fora do range"
+    assert m[2001] == "fora do intervalo"
     assert 2002 in r["selecionados"]
     # modo %: 3% de 500 = 15 cm -> 2001 entra
     r2 = analogia.calcular(doc_base(anos), 3, "pct")

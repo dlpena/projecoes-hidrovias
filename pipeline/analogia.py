@@ -142,7 +142,7 @@ def calcular(doc: dict, range_valor: float = 10.0, modo: str = "cm") -> dict:
             cand["delta"] = cota_d - minimo
 
         if abs(cota_d - cota_atual) > limite:
-            cand["motivo"] = "fora do range"
+            cand["motivo"] = "fora do intervalo"
             candidatos.append(cand)
             continue
 
@@ -173,11 +173,11 @@ def calcular(doc: dict, range_valor: float = 10.0, modo: str = "cm") -> dict:
         "aviso": None,
     }
     if not selecionados:
-        resultado["aviso"] = "Nenhum ano análogo no range — amplie o range."
+        resultado["aviso"] = "Nenhum ano análogo no intervalo — amplie o intervalo."
         return resultado
     if len(selecionados) < MIN_ANALOGOS:
         resultado["aviso"] = (
-            f"Apenas {len(selecionados)} ano(s) análogo(s) — amplie o range."
+            f"Apenas {len(selecionados)} ano(s) análogo(s) — amplie o intervalo."
         )
 
     maior = max(selecionados, key=lambda c: c["delta"])

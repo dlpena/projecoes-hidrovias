@@ -231,7 +231,7 @@ const Grafico = (() => {
     L.push(`Gerado em;${new Date().toLocaleString("pt-BR")}`);
     L.push(`Dados atualizados em;${formatarDataBR(doc.ultima_data)};fonte do último dado;${doc.fonte_ultimo_dado}`);
     L.push(`Dia D;${formatarDataBR(r.dia_d)};Cota atual (cm);${numeroBR(r.cota_atual, 0)}`);
-    L.push(`Range;±${numeroBR(r.range_valor)} ${r.modo === "cm" ? "cm" : "%"};equivalente em cm;±${numeroBR(r.limite_cm)}`);
+    L.push(`Intervalo (cota atual ±);${numeroBR(r.range_valor)} ${r.modo === "cm" ? "cm" : "%"};equivalente em cm;±${numeroBR(r.limite_cm)}`);
     L.push(`Regras;tolerância ±3 dias no dia D;cobertura pós-D ≥80% e dado nos últimos 10 dias do ano`);
     L.push("");
     L.push("BLOCO 1 — Anos candidatos (universo completo e seleção)");
@@ -294,7 +294,9 @@ const Grafico = (() => {
           · ${doc.ultimo_valor} cm (${doc.fonte_ultimo_dado})</span>
       </div>
       <div class="controles">
-        <label>Range <input type="range" min="1" max="100" step="1" value="10" class="ctl-slider">
+        <label title="Entram como análogos os anos em que a cota, neste mesmo dia do calendário, estava até este valor acima ou abaixo da cota atual.">
+          Intervalo (cota atual ±)
+          <input type="range" min="1" max="100" step="1" value="10" class="ctl-slider">
           <input type="number" min="0.5" max="500" step="0.5" value="10" class="ctl-num">
           <span class="ctl-unidade">cm</span></label>
         <span class="modo">
@@ -304,8 +306,8 @@ const Grafico = (() => {
         <span>Anos análogos: <span class="contagem">–</span></span>
         <span class="acoes">
           <button type="button" class="botao-csv botao-memoria"
-             title="Memória de cálculo em PDF com o range ajustado nos controles">Memória de cálculo (PDF)</button>
-          <button type="button" class="botao-csv botao-sec" title="Memória de cálculo em CSV com o range ajustado nos controles">CSV</button>
+             title="Memória de cálculo em PDF com o intervalo ajustado nos controles">Memória de cálculo (PDF)</button>
+          <button type="button" class="botao-csv botao-sec" title="Memória de cálculo em CSV com o intervalo ajustado nos controles">CSV</button>
         </span>
       </div>
       <p class="aviso"></p>

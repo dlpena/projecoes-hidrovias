@@ -109,7 +109,7 @@ const Analogia = (() => {
       }
 
       if (Math.abs(cotaD - cotaAtual) > limite) {
-        cand.motivo = "fora do range";
+        cand.motivo = "fora do intervalo";
         candidatos.push(cand);
         continue;
       }
@@ -143,11 +143,11 @@ const Analogia = (() => {
       aviso: null,
     };
     if (!selecionados.length) {
-      resultado.aviso = "Nenhum ano análogo no range — amplie o range.";
+      resultado.aviso = "Nenhum ano análogo no intervalo — amplie o intervalo.";
       return resultado;
     }
     if (selecionados.length < MIN_ANALOGOS) {
-      resultado.aviso = `Apenas ${selecionados.length} ano(s) análogo(s) — amplie o range.`;
+      resultado.aviso = `Apenas ${selecionados.length} ano(s) análogo(s) — amplie o intervalo.`;
     }
 
     let maior = selecionados[0], menor = selecionados[0];
