@@ -296,7 +296,7 @@ const Grafico = (() => {
       <div class="controles">
         <label title="Entram como análogos os anos em que a cota, neste mesmo dia do calendário, estava até este valor acima ou abaixo da cota atual.">
           Intervalo (cota atual ±)
-          <input type="range" min="1" max="100" step="1" value="10" class="ctl-slider">
+          <input type="range" min="1" max="500" step="1" value="10" class="ctl-slider">
           <input type="number" min="0.5" max="500" step="0.5" value="10" class="ctl-num">
           <span class="ctl-unidade">cm</span></label>
         <span class="modo">
@@ -330,7 +330,7 @@ const Grafico = (() => {
     // intervalo inicial: o menor (≥50 cm) que contém pelo menos 3 anos análogos
     const rangeAuto = Analogia.rangeInicial(doc);
     const estado = { range: rangeAuto, modo: "cm", resultado: null };
-    if (rangeAuto > 100) el.slider.max = String(Math.ceil(rangeAuto * 2));
+    if (rangeAuto > 500) el.slider.max = String(Math.ceil(rangeAuto * 2));
     el.slider.value = String(rangeAuto);
     el.num.value = String(rangeAuto);
 
@@ -379,7 +379,7 @@ const Grafico = (() => {
       el.unidade.textContent = modo === "cm" ? "cm" : "%";
       el.slider.step = modo === "cm" ? "1" : "0.1";
       el.slider.max = modo === "cm"
-        ? String(Math.max(100, Math.ceil(rangeAuto * 2), Math.ceil(novo)))
+        ? String(Math.max(500, Math.ceil(rangeAuto * 2), Math.ceil(novo)))
         : String(Math.max(20, Math.ceil(novo * 2)));
       el.slider.value = String(novo);
       el.num.value = String(novo);
