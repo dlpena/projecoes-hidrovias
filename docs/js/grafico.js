@@ -327,7 +327,7 @@ const Grafico = (() => {
       rodape: sec.querySelector(".estacao-rodape"),
       csv: sec.querySelector(".botao-sec"),
     };
-    // range inicial: o menor (≥10 cm) que contém pelo menos 3 anos análogos
+    // intervalo inicial: o menor (≥50 cm) que contém pelo menos 3 anos análogos
     const rangeAuto = Analogia.rangeInicial(doc);
     const estado = { range: rangeAuto, modo: "cm", resultado: null };
     if (rangeAuto > 100) el.slider.max = String(Math.ceil(rangeAuto * 2));

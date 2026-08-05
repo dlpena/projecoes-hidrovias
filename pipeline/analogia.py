@@ -82,7 +82,7 @@ def _interpolar(valores: list) -> tuple[list, list]:
     return out, flags
 
 
-def range_inicial(doc: dict, min_analogos: int = MIN_ANALOGOS, minimo: float = 10.0) -> float:
+def range_inicial(doc: dict, min_analogos: int = MIN_ANALOGOS, minimo: float = 50.0) -> float:
     """Menor range inteiro (cm, >= minimo) que seleciona pelo menos min_analogos anos.
 
     Se nem com range infinito há min_analogos anos elegíveis, retorna o range que

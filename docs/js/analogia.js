@@ -59,7 +59,7 @@ const Analogia = (() => {
 
   /** Menor range inteiro (cm, >= minimo) que seleciona pelo menos minAnalogos anos.
    * Espelho de analogia.range_inicial(). */
-  function rangeInicial(doc, minAnalogos = MIN_ANALOGOS, minimo = 10.0) {
+  function rangeInicial(doc, minAnalogos = MIN_ANALOGOS, minimo = 50.0) {
     const r = calcular(doc, Infinity, "cm");
     const dists = r.candidatos
       .filter((c) => c.selecionado)

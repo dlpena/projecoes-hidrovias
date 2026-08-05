@@ -159,21 +159,22 @@ def test_29fev_ano_nao_bissexto_ignorado():
 
 
 def test_range_inicial():
-    """Menor range (>=10) que contém pelo menos 3 análogos."""
+    """Menor intervalo (>=50) que contém pelo menos 3 análogos."""
     anos = {"2026": serie_constante(500, 0, IDX_1JUL + 1, 2026)}
-    for ano, cota in (("2001", 502), ("2002", 512), ("2003", 527), ("2004", 560)):
+    for ano, cota in (("2001", 502), ("2002", 512), ("2003", 577), ("2004", 620)):
         anos[ano] = serie_constante(cota, ano=int(ano))
-    # distâncias: 2, 12, 27, 60 -> 3ª menor = 27
-    assert analogia.range_inicial(doc_base(anos)) == 27
-    # com só 2 anos elegíveis, cobre todos (distâncias 2, 12 -> 12)
-    anos2 = {k: anos[k] for k in ("2026", "2001", "2002")}
-    assert analogia.range_inicial(doc_base(anos2)) == 12
-    # distâncias pequenas: nunca abaixo de 10
+    # distâncias: 2, 12, 77, 120 -> 3ª menor = 77
+    assert analogia.range_inicial(doc_base(anos)) == 77
+    # com só 2 anos elegíveis, cobre todos (distâncias 2, 62 -> 62)
+    anos2 = {"2026": anos["2026"], "2001": anos["2001"],
+             "2002": serie_constante(562, ano=2002)}
+    assert analogia.range_inicial(doc_base(anos2)) == 62
+    # distâncias pequenas: nunca abaixo de 50
     anos3 = {"2026": anos["2026"],
              "2001": serie_constante(501, ano=2001),
              "2002": serie_constante(503, ano=2002),
              "2003": serie_constante(504, ano=2003)}
-    assert analogia.range_inicial(doc_base(anos3)) == 10
+    assert analogia.range_inicial(doc_base(anos3)) == 50
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node não disponível")

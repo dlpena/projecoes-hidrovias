@@ -22,7 +22,8 @@ pelo data lake da ANA via pipeline local.
 ## Metodologia da projeção
 
 A partir do último dado do ano corrente (dia D), selecionam-se os anos históricos
-cuja cota no mesmo dia/mês está dentro do range (default ±10 cm; tolerância de ±3
+cuja cota no mesmo dia/mês está dentro do intervalo escolhido em torno da cota
+atual (inicial: o menor ≥50 cm com pelo menos 3 anos análogos; tolerância de ±3
 dias quando falta o dado exato; exige-se ≥80% de cobertura entre D e 31/dez e dado
 nos últimos 10 dias do ano). Desse universo saem 3 trajetórias até 31/dez,
 deslocadas para coincidir com a cota atual: a do ano de **maior queda**
