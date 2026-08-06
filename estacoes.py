@@ -17,6 +17,10 @@ ESTACOES = [
      "estcodigo_telemetria": 190057360, "codigo_hidroweb": 66825000},
     {"slug": "porto-murtinho", "nome": "PORTO MURTINHO", "rio": "Paraguai",
      "estcodigo_telemetria": 214257560, "codigo_hidroweb": 67100000},
+    {"slug": "itacoatiara", "nome": "ITACOATIARA", "rio": "Amazonas",
+     "estcodigo_telemetria": 30858250, "codigo_hidroweb": 16030000},
+    {"slug": "manaus", "nome": "MANAUS", "rio": "Negro",
+     "estcodigo_telemetria": 30659600, "codigo_hidroweb": 14990000},
 ]
 
 POR_SLUG = {e["slug"]: e for e in ESTACOES}
