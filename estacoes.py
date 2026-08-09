@@ -17,12 +17,14 @@ ESTACOES = [
      "estcodigo_telemetria": 190057360, "codigo_hidroweb": 66825000},
     {"slug": "porto-murtinho", "nome": "PORTO MURTINHO", "rio": "Paraguai",
      "estcodigo_telemetria": 214257560, "codigo_hidroweb": 67100000},
-    # ano_inicio 1997: a era 1927-1944 usa outra referência de nível (zero da
-    # régua ~9 m abaixo da atual — máximas de ~1.100 cm vs ~2.100 cm na era
-    # moderna). Misturar as duas eras quebraria a média e a analogia.
+    # ano_inicio 2009: a estação trocou de referência de nível mais de uma vez —
+    # a era 1927-1944 tem zero ~9 m abaixo; e o datum atual só entra no
+    # consistido em mar/2008 (bruto realinha em 2010, telemetria em out/2010).
+    # 2009 é o primeiro ano civil inteiro no datum atual; misturar eras
+    # quebraria a média e a analogia (conjuntos de curvas ~8 m apartados).
     {"slug": "itacoatiara", "nome": "ITACOATIARA", "rio": "Amazonas",
      "estcodigo_telemetria": 30858250, "codigo_hidroweb": 16030000,
-     "ano_inicio": 1997},
+     "ano_inicio": 2009},
     {"slug": "manaus", "nome": "MANAUS", "rio": "Negro",
      "estcodigo_telemetria": 30659600, "codigo_hidroweb": 14990000},
 ]
