@@ -24,11 +24,15 @@ ESTACOES = [
     {"slug": "porto-murtinho", "nome": "PORTO MURTINHO", "rio": "Paraguai",
      "estcodigo_telemetria": 214257560, "codigo_hidroweb": 67100000},
     # ano_inicio 2009: a estação teve TRÊS referências de nível distintas —
-    # 1927-1944 roda ~5 m ABAIXO do datum atual (mediana -497 cm na
-    # climatologia mensal), 1997-2007 roda ~8 m ACIMA (era o "andar de cima"
-    # nos gráficos), e o datum atual entra no consistido em mar/2008 (bruto
-    # realinha em 2010, telemetria em out/2010). 2009 é o primeiro ano civil
-    # inteiro no datum atual; misturar eras quebraria a média e a analogia.
+    # 1927-1944 lê ~4,5 m ABAIXO do datum atual (a relação Itacoatiara-Manaus,
+    # com Manaus no mesmo datum desde 1902 como controle de clima, mudou
+    # -447 cm entre as eras, consistente mês a mês), 1997-2007 lê ~8 m ACIMA
+    # (era o "andar de cima" nos gráficos), e o datum atual entra no consistido
+    # em mar/2008 (bruto realinha em 2010, telemetria em out/2010). 2009 é o
+    # primeiro ano civil inteiro no datum atual; misturar eras quebraria a
+    # média e a analogia. Recuperar 1927-1944 somando o offset é possível mas
+    # não recomendado: incerteza de ±0,5-1 m, sazonalidade na relação e perda
+    # de auditabilidade (dado oficial alterado por correção caseira).
     {"slug": "itacoatiara", "nome": "ITACOATIARA", "rio": "Amazonas",
      "estcodigo_telemetria": 30858250, "codigo_hidroweb": 16030000,
      "ano_inicio": 2009},
