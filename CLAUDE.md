@@ -28,6 +28,15 @@ MANAUS —, alimentado por pipeline Python local agendado 2x/dia (10h e 14h).
   avisos, CSV, memória de cálculo, PDF. Nomes internos de código (`range_valor`, `modo`, `rangeInicial`)
   continuam em inglês/português técnico, sem relação com o texto exibido.
 - Estações: definidas apenas em `estacoes.py` (o site lê `docs/dados/indice.json` gerado dali).
+  `ano_inicio` por estação corta anos não comparáveis com o regime atual — hoje: ITACOATIARA 2009
+  (três referências de nível distintas na história) e ABUNÃ 2014 (remanso da UHE Jirau elevou as
+  mínimas ~3 m desde o enchimento). O racional de cada corte está comentado no próprio arquivo.
+- **Sentinela de referência de nível** (`pipeline/verificacoes.py`): toda rodada compara medianas
+  anuais em janelas de 3 anos e loga WARNING se houver degrau sustentado anômalo para a estação
+  (max(300 cm, 4x o degrau ano-a-ano típico); só anos com ≥300 dias). Nasceu do caso Itacoatiara
+  (ago/2026), em que um degrau de datum de ~8 m só foi percebido visualmente — e tarde. Se o
+  alerta disparar, investigar fonte a fonte (consistido vs bruto vs telemetria em sobreposição)
+  antes de decidir `ano_inicio`; degrau real de clima/regime não deve ser cortado sem análise.
 - **JSON por estação é dividido em dois arquivos**: `{slug}_historico.json` (anos anteriores ao
   corrente; `exportar_json._gravar_se_mudou` só regrava se o conteúdo de fato mudou, para manter o
   blob git/ETag estável e o navegador reaproveitar cache) e `{slug}_atual.json` (só o ano corrente,

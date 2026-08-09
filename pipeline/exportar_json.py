@@ -25,6 +25,7 @@ from pathlib import Path
 import pandas as pd
 
 from pipeline import DIR_DADOS_SITE
+from pipeline import verificacoes
 
 # offsets acumulados dos meses num calendário sempre-bissexto (jan=31, fev=29, ...)
 OFFSETS_MES = [0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335]
@@ -160,6 +161,9 @@ def exportar_estacao(estacao: dict, integrada: pd.DataFrame,
         "cobertura_fontes": _filtrar_cobertura(cobertura, lambda a: a == ano_atual),
         "anos": {str(ano_atual): anos[str(ano_atual)]},
     }
+
+    # sentinela contra mudança de referência de nível não tratada (caso Itacoatiara)
+    verificacoes.alertar_saltos(estacao["slug"], anos)
 
     _gravar_se_mudou(DIR_DADOS_SITE / f"{estacao['slug']}_historico.json", historico)
     _gravar_atomico(DIR_DADOS_SITE / f"{estacao['slug']}_atual.json", atual)

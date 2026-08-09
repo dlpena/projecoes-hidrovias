@@ -158,6 +158,46 @@ def test_29fev_ano_nao_bissexto_ignorado():
     assert c["cobertura"] == 1.0 and c["selecionado"]
 
 
+def test_detector_saltos_referencia():
+    """Degrau sustentado de datum é detectado; variação climática não."""
+    from pipeline import verificacoes
+
+    def ano_constante(v, ano):
+        return serie_constante(v, ano=ano)
+
+    # degrau de +900 cm entre 2007 e 2008 (caso Itacoatiara 1997-2007)
+    anos = {}
+    for a in range(2000, 2008):
+        anos[str(a)] = ano_constante(1750 + (a % 3) * 40, a)
+    for a in range(2008, 2016):
+        anos[str(a)] = ano_constante(950 + (a % 3) * 40, a)
+    alertas = verificacoes.detectar_saltos_referencia(anos)
+    assert len(alertas) == 1
+    assert alertas[0]["entre"] == [2007, 2008]
+    assert alertas[0]["dif_mediana_cm"] < -700
+
+    # variação climática decadal (~180 cm, caso Ladário) NÃO alerta
+    anos2 = {}
+    for a in range(1955, 1965):
+        anos2[str(a)] = ano_constante(120 + (a % 4) * 30, a)
+    for a in range(1965, 1975):
+        anos2[str(a)] = ano_constante(300 + (a % 4) * 30, a)
+    assert verificacoes.detectar_saltos_referencia(anos2) == []
+
+    # degrau detectado mesmo através de lacuna de décadas (1944 | 1997)
+    anos3 = {str(a): ano_constante(500, a) for a in range(1935, 1945)}
+    anos3.update({str(a): ano_constante(1400, a) for a in range(1997, 2005)})
+    alertas3 = verificacoes.detectar_saltos_referencia(anos3)
+    assert len(alertas3) == 1 and alertas3[0]["entre"] == [1944, 1997]
+
+    # ano com poucos dados não conta para a mediana
+    anos4 = {"2000": ano_constante(500, 2000), "2001": ano_constante(505, 2001)}
+    quase_vazio = [None] * 366
+    quase_vazio[10] = 5000
+    anos4["2002"] = quase_vazio
+    assert verificacoes.detectar_saltos_referencia(anos4) == []
+
+
 def test_range_inicial():
     """Menor intervalo (>=50) que contém pelo menos 3 análogos."""
     anos = {"2026": serie_constante(500, 0, IDX_1JUL + 1, 2026)}
