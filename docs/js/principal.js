@@ -18,9 +18,7 @@
   ajuda.addEventListener("click", (e) => { if (e.target === ajuda) ajuda.close(); });
 
   try {
-    const resp = await fetch("dados/indice.json", { cache: "no-cache" });
-    if (!resp.ok) throw new Error(`indice.json: HTTP ${resp.status}`);
-    const indice = await resp.json();
+    const indice = await Dados.carregarIndice();
     carimbo.textContent = `Atualizado em ${dataHoraBR(indice.atualizado_em)}`;
 
     for (const e of indice.estacoes) {
@@ -32,9 +30,7 @@
 
     for (const e of indice.estacoes) {
       try {
-        const r = await fetch(`dados/${e.slug}.json`, { cache: "no-cache" });
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        Grafico.montarSecao(main, await r.json());
+        Grafico.montarSecao(main, await Dados.carregarEstacao(e.slug));
       } catch (err) {
         const p = document.createElement("p");
         p.className = "erro";

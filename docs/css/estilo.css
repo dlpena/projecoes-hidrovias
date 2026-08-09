@@ -46,6 +46,8 @@ body {
 }
 .topo-meta button:hover:enabled { background: var(--acento); color: #fff; }
 .topo-meta button:disabled { opacity: 0.6; cursor: wait; }
+.link-secundario { font-weight: 600; color: var(--acento); text-decoration: none; }
+.link-secundario:hover { text-decoration: underline; }
 
 .nav-estacoes { display: flex; flex-wrap: wrap; gap: 6px; }
 .nav-estacoes a {

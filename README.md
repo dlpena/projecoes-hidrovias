@@ -1,8 +1,8 @@
 # Hidrovias Joaquim — Projeções de cota por analogia
 
-Site estático com projeções de nível d'água para 6 estações fluviométricas
-(Itaituba, Abunã, Porto Velho, Tabatinga, Ladário e Porto Murtinho), alimentado
-pelo data lake da ANA via pipeline local.
+Site estático com projeções de nível d'água para 8 estações fluviométricas
+(Itaituba, Abunã, Porto Velho, Tabatinga, Ladário, Porto Murtinho, Itacoatiara
+e Manaus), alimentado pelo data lake da ANA via pipeline local.
 
 ## Como funciona
 
@@ -10,14 +10,24 @@ pelo data lake da ANA via pipeline local.
    da ANA (série integrada: HIDRO consistido > bruto > telemetria), de forma
    **incremental** — o histórico já consolidado fica congelado em
    `dados/cache/*.parquet` e cada rodada consulta só a janela recente.
-2. Gera `docs/dados/{estacao}.json` (matriz ano × dia, cm) e faz `git push` — o
-   GitHub Pages (branch main, pasta `/docs`) publica o site.
-3. **Site** (`docs/`): HTML+JS puro com Plotly e jsPDF vendorizados — o cálculo da
-   analogia roda no navegador, então o range (± cm ou %) é ajustável com resposta
-   imediata. **Todas as exportações são geradas na hora, refletindo o que está na
-   tela**: PDF do conjunto (capa + 6 gráficos como visualizados), memória de
-   cálculo em PDF por estação (parâmetros, cobertura por fonte, anos candidatos,
-   projeções e série dia a dia) e CSV.
+2. Gera, por estação, `docs/dados/{estacao}_historico.json` (todos os anos
+   anteriores ao corrente — só é regravado quando o conteúdo realmente muda) e
+   `docs/dados/{estacao}_atual.json` (só o ano corrente, pequeno, sempre
+   regravado a cada rodada). Isso permite que o navegador reaproveite o cache
+   do histórico entre visitas, baixando de fato só o que mudou. Depois faz
+   `git push` — o GitHub Pages (branch main, pasta `/docs`) publica o site.
+3. **Site** (`docs/`): HTML+JS puro com Plotly e jsPDF vendorizados —
+   `docs/js/dados.js` busca e mescla os dois arquivos de cada estação num único
+   objeto, consumido igualmente pelas duas páginas do site:
+   - **Projeções** (`index.html`): o cálculo da analogia roda no navegador, então
+     o intervalo (± cm ou %) é ajustável com resposta imediata. Todas as
+     exportações são geradas na hora, refletindo o que está na tela — PDF do
+     conjunto (capa + 8 gráficos como visualizados), memória de cálculo em PDF
+     por estação (parâmetros, cobertura por fonte, anos candidatos, projeções e
+     série dia a dia) e CSV.
+   - **Histórico completo** (`historico.html`): todos os anos de cada estação
+     sobrepostos, com a média histórica e o ano vigente em destaque (valor mais
+     recente marcado no gráfico).
 
 ## Metodologia da projeção
 
@@ -37,7 +47,7 @@ análogos. Com menos de 3 análogos o gráfico exibe aviso.
 ## Uso
 
 ```bash
-# rodada normal (incremental, todas as estações, com PDF e push)
+# rodada normal (incremental, todas as estações, com push)
 python atualizar.py
 
 # opções

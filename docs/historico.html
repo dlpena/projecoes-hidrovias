@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Histórico completo — Estações-Chave para Hidrovias</title>
+  <link rel="stylesheet" href="css/estilo.css">
+  <script src="vendor/plotly.min.js"></script>
+</head>
+<body>
+  <header class="topo">
+    <div>
+      <h1>Histórico completo — Estações-Chave para Hidrovias</h1>
+      <p class="subtitulo">Todos os anos da série integrada (HIDRO consistido &gt; bruto &gt; telemetria)
+        com a média e o ano vigente em destaque</p>
+    </div>
+    <div class="topo-acoes">
+      <nav id="nav-estacoes" class="nav-estacoes"></nav>
+      <div class="topo-meta">
+        <span id="carimbo">Carregando…</span>
+        <a href="index.html" class="link-secundario">← Projeções por analogia</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="conteudo-historico"></main>
+
+  <footer class="rodape">
+    <p>Cada gráfico mostra todos os anos disponíveis daquela estação em cinza-claro, a
+    <strong>média histórica</strong> dia a dia (pontilhada) e o <strong>ano vigente</strong> em
+    destaque, com o valor do dado mais recente marcado no gráfico. Para a projeção por analogia
+    (intervalo ajustável, exportações), veja a
+    <a href="index.html" class="link-secundario">página principal</a>.
+    Fonte: data lake da ANA (banco HIDRO e telemetria).</p>
+  </footer>
+
+  <script src="js/dados.js"></script>
+  <script src="js/analogia.js"></script>
+  <script src="js/pagina_historico.js"></script>
+</body>
+</html>

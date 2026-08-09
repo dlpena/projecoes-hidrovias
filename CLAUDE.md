@@ -28,6 +28,15 @@ MANAUS —, alimentado por pipeline Python local agendado 2x/dia (10h e 14h).
   avisos, CSV, memória de cálculo, PDF. Nomes internos de código (`range_valor`, `modo`, `rangeInicial`)
   continuam em inglês/português técnico, sem relação com o texto exibido.
 - Estações: definidas apenas em `estacoes.py` (o site lê `docs/dados/indice.json` gerado dali).
+- **JSON por estação é dividido em dois arquivos**: `{slug}_historico.json` (anos anteriores ao
+  corrente; `exportar_json._gravar_se_mudou` só regrava se o conteúdo de fato mudou, para manter o
+  blob git/ETag estável e o navegador reaproveitar cache) e `{slug}_atual.json` (só o ano corrente,
+  sempre regravado). `docs/js/dados.js` busca e mescla os dois num único `doc` — todo código
+  consumidor (`grafico.js`, `analogia.js`, `exportar_pdf.js`, `pagina_historico.js`) trabalha só com
+  o `doc` mesclado, sem saber da divisão.
+- Duas páginas no site: `index.html` (projeções por analogia, intervalo ajustável) e
+  `historico.html` (série completa por estação com média histórica e ano vigente em destaque,
+  sem controles/exportações).
 - Projeto irmão `[projeto local]` (vazão da UHE Belo Monte Montante) reusa a mesma aparência/
   algoritmo — mudanças em `docs/css`, `docs/js/grafico.js` ou nas regras de `analogia.py`/`.js` devem
   ser espelhadas lá também (ver o CLAUDE.md de lá).

@@ -2,6 +2,17 @@
 
 Formato: matriz ano -> array de 366 posições (calendário fixo com 29/fev;
 índice 0 = 1/jan). null = sem dado. Valores inteiros em cm.
+
+Cada estação vira DOIS arquivos, para o navegador poder cachear o que não muda:
+- `{slug}_historico.json`: todos os anos ANTERIORES ao corrente (dado que já
+  não muda de uma rodada para outra). Só é regravado quando o conteúdo
+  realmente muda (ex.: reconsistência retroativa via --full) — assim o blob
+  git e o ETag do Pages ficam estáveis, e o navegador reaproveita o cache em
+  vez de rebaixar dezenas de anos a cada visita.
+- `{slug}_atual.json`: só o ano corrente (o que de fato muda a cada rodada).
+  Pequeno, sempre regravado.
+O site (`docs/js/dados.js`) busca os dois e mescla num único objeto `doc` com
+o mesmo formato que os módulos de gráfico/analogia sempre esperaram.
 """
 
 from __future__ import annotations
@@ -24,10 +35,31 @@ def indice_dia(mes: int, dia: int) -> int:
     return OFFSETS_MES[mes - 1] + dia - 1
 
 
-def _gravar_atomico(caminho: Path, conteudo: str) -> None:
+def _gravar_atomico(caminho: Path, doc: dict) -> None:
+    conteudo = json.dumps(doc, ensure_ascii=False, separators=(",", ":"))
     tmp = caminho.with_suffix(caminho.suffix + ".tmp")
     tmp.write_text(conteudo, encoding="utf-8")
     os.replace(tmp, caminho)
+
+
+def _gravar_se_mudou(caminho: Path, doc: dict, ignorar: tuple[str, ...] = ("gerado_em",)) -> bool:
+    """Só regrava o arquivo se o conteúdo (fora os campos em `ignorar`) mudou.
+
+    Mantém o blob git e o ETag do Pages estáveis quando nada de fato mudou,
+    para o navegador reaproveitar o cache. Retorna True se regravou.
+    """
+    if caminho.exists():
+        try:
+            existente = json.loads(caminho.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            existente = None
+        if existente is not None:
+            comparavel_novo = {k: v for k, v in doc.items() if k not in ignorar}
+            comparavel_velho = {k: v for k, v in existente.items() if k not in ignorar}
+            if comparavel_novo == comparavel_velho:
+                return False
+    _gravar_atomico(caminho, doc)
+    return True
 
 
 def _dias_no_ano(ano: int) -> int:
@@ -63,10 +95,21 @@ def cobertura_fontes(df_hidro: pd.DataFrame | None,
     return {f: c for f, c in fontes.items() if c}
 
 
+def _filtrar_cobertura(cobertura: dict, incluir_ano) -> dict:
+    filtrada = {
+        fonte: {a: p for a, p in cob.items() if incluir_ano(int(a))}
+        for fonte, cob in cobertura.items()
+    }
+    return {f: c for f, c in filtrada.items() if c}
+
+
 def exportar_estacao(estacao: dict, integrada: pd.DataFrame,
                      df_hidro: pd.DataFrame | None = None,
                      df_tele: pd.DataFrame | None = None) -> dict:
-    """Grava docs/dados/{slug}.json e retorna o resumo para o indice.json."""
+    """Grava docs/dados/{slug}_historico.json e {slug}_atual.json.
+
+    Retorna o resumo para o indice.json.
+    """
     anos: dict[str, list] = {}
     fontes_por_ano: dict[str, set] = {}
     for ts, valor, fonte in integrada[["data", "valor", "fonte"]].itertuples(index=False):
@@ -76,34 +119,52 @@ def exportar_estacao(estacao: dict, integrada: pd.DataFrame,
             fontes_por_ano[chave] = set()
         anos[chave][indice_dia(ts.month, ts.day)] = int(round(valor))
         fontes_por_ano[chave].add(fonte)
+    fontes_por_ano_str = {ano: "+".join(sorted(f)) for ano, f in fontes_por_ano.items()}
 
     ultima = integrada.iloc[-1]
-    doc = {
+    ano_atual = int(ultima["data"].year)
+    agora = datetime.now().astimezone().isoformat(timespec="seconds")
+    cobertura = cobertura_fontes(df_hidro, df_tele)
+
+    meta = {
         "slug": estacao["slug"],
         "nome": estacao["nome"],
         "rio": estacao.get("rio"),
         "codigo_hidroweb": estacao["codigo_hidroweb"],
         "estcodigo_telemetria": estacao["estcodigo_telemetria"],
-        "unidade": "cm",
-        "gerado_em": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "variavel": estacao.get("variavel", "cota"),
+        "grandeza": estacao.get("grandeza", "Cota"),
+        "unidade": estacao.get("unidade", "cm"),
+    }
+
+    historico = {
+        **meta,
+        "gerado_em": agora,
+        "fonte_por_ano": {a: f for a, f in sorted(fontes_por_ano_str.items()) if int(a) != ano_atual},
+        "cobertura_fontes": _filtrar_cobertura(cobertura, lambda a: a != ano_atual),
+        "anos": {a: anos[a] for a in sorted(anos) if int(a) != ano_atual},
+    }
+    atual = {
+        **meta,
+        "gerado_em": agora,
         "ultima_data": ultima["data"].date().isoformat(),
         "ultimo_valor": int(round(ultima["valor"])),
         "fonte_ultimo_dado": ultima["fonte"],
-        "fonte_por_ano": {
-            ano: "+".join(sorted(f)) for ano, f in sorted(fontes_por_ano.items())
-        },
-        "cobertura_fontes": cobertura_fontes(df_hidro, df_tele),
-        "anos": {ano: anos[ano] for ano in sorted(anos)},
+        "fonte_por_ano": {a: f for a, f in fontes_por_ano_str.items() if int(a) == ano_atual},
+        "cobertura_fontes": _filtrar_cobertura(cobertura, lambda a: a == ano_atual),
+        "anos": {str(ano_atual): anos[str(ano_atual)]},
     }
-    caminho = DIR_DADOS_SITE / f"{estacao['slug']}.json"
-    _gravar_atomico(caminho, json.dumps(doc, ensure_ascii=False, separators=(",", ":")))
+
+    _gravar_se_mudou(DIR_DADOS_SITE / f"{estacao['slug']}_historico.json", historico)
+    _gravar_atomico(DIR_DADOS_SITE / f"{estacao['slug']}_atual.json", atual)
+
     return {
         "slug": estacao["slug"],
         "nome": estacao["nome"],
         "rio": estacao.get("rio"),
-        "ultima_data": doc["ultima_data"],
-        "ultimo_valor": doc["ultimo_valor"],
-        "fonte_ultimo_dado": doc["fonte_ultimo_dado"],
+        "ultima_data": atual["ultima_data"],
+        "ultimo_valor": atual["ultimo_valor"],
+        "fonte_ultimo_dado": atual["fonte_ultimo_dado"],
     }
 
 
@@ -112,7 +173,4 @@ def exportar_indice(resumos: list[dict]) -> None:
         "atualizado_em": datetime.now().astimezone().isoformat(timespec="seconds"),
         "estacoes": resumos,
     }
-    _gravar_atomico(
-        DIR_DADOS_SITE / "indice.json",
-        json.dumps(doc, ensure_ascii=False, separators=(",", ":")),
-    )
+    _gravar_atomico(DIR_DADOS_SITE / "indice.json", doc)
