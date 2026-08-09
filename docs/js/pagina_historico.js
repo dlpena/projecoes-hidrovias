@@ -51,17 +51,33 @@
   }
 
   function mediaHistorica(doc, anoAtual) {
-    const anos = Object.keys(doc.anos).filter((a) => Number(a) !== anoAtual);
+    const anos = Object.keys(doc.anos).map(Number).filter((a) => a !== anoAtual);
     const media = new Array(366).fill(null);
     for (let i = 0; i < 366; i++) {
       const vals = [];
       for (const a of anos) {
-        const v = doc.anos[a][i];
+        const v = doc.anos[String(a)][i];
         if (v !== null && v !== undefined) vals.push(v);
       }
       if (vals.length >= 3) media[i] = vals.reduce((s, v) => s + v, 0) / vals.length;
     }
-    return { media, nAnos: anos.length };
+    return {
+      media,
+      nAnos: anos.length,
+      anoIni: Math.min(...anos),
+      anoFim: Math.max(...anos),
+    };
+  }
+
+  /** Mínimo da média no calendário: {valor, data ISO} (null se não houver). */
+  function minimoDaMedia(media, datas) {
+    let min = null, dataMin = null;
+    for (let i = 0; i < 366; i++) {
+      if (datas[i] !== null && media[i] !== null) {
+        if (min === null || media[i] < min) { min = media[i]; dataMin = datas[i]; }
+      }
+    }
+    return { min, dataMin };
   }
 
   function layout(doc, anoAtual) {
@@ -138,13 +154,21 @@
       traces.push(traceAno(doc.anos[chave], datas, String(ano), COR_FUNDO, 1, unidade,
                            { legenda: false }));
     }
-    const { media, nAnos } = mediaHistorica(doc, anoAtual);
-    traces.push(traceAno(media, datas, `Média (${nAnos} anos)`, COR_MEDIA, 2.2, unidade,
-                         { dash: "dot" }));
+    const { media, nAnos, anoIni, anoFim } = mediaHistorica(doc, anoAtual);
+    traces.push(traceAno(media, datas, `Média (${anoIni}–${anoFim} · ${nAnos} anos)`,
+                         COR_MEDIA, 2.2, unidade, { dash: "dot" }));
     traces.push(traceAno(doc.anos[String(anoAtual)], datas, `Observado ${anoAtual}`,
                          COR_VIGENTE, 2.5, unidade));
     traces.push(marcadorValor(doc.ultima_data, doc.ultimo_valor,
                               String(Math.round(doc.ultimo_valor)), COR_VIGENTE, "top center"));
+
+    // mínimo da média no ano, com valor e data (dia/mês)
+    const { min, dataMin } = minimoDaMedia(media, datas);
+    if (min !== null) {
+      traces.push(marcadorValor(dataMin, min,
+                                `${Math.round(min)} (${dataMin.slice(8, 10)}/${dataMin.slice(5, 7)})`,
+                                COR_MEDIA, "bottom center"));
+    }
 
     Plotly.newPlot(sec.querySelector(".grafico"), traces, layout(doc, anoAtual), CONFIG);
   }

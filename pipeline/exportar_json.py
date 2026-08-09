@@ -108,8 +108,12 @@ def exportar_estacao(estacao: dict, integrada: pd.DataFrame,
                      df_tele: pd.DataFrame | None = None) -> dict:
     """Grava docs/dados/{slug}_historico.json e {slug}_atual.json.
 
-    Retorna o resumo para o indice.json.
+    Retorna o resumo para o indice.json. Se a estação define `ano_inicio`
+    (ex.: mudança de referência de nível), anos anteriores ficam fora do site.
     """
+    ano_inicio = estacao.get("ano_inicio")
+    if ano_inicio:
+        integrada = integrada[integrada["data"].dt.year >= ano_inicio]
     anos: dict[str, list] = {}
     fontes_por_ano: dict[str, set] = {}
     for ts, valor, fonte in integrada[["data", "valor", "fonte"]].itertuples(index=False):
@@ -125,6 +129,8 @@ def exportar_estacao(estacao: dict, integrada: pd.DataFrame,
     ano_atual = int(ultima["data"].year)
     agora = datetime.now().astimezone().isoformat(timespec="seconds")
     cobertura = cobertura_fontes(df_hidro, df_tele)
+    if ano_inicio:
+        cobertura = _filtrar_cobertura(cobertura, lambda a: a >= ano_inicio)
 
     meta = {
         "slug": estacao["slug"],
