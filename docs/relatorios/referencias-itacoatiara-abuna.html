@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Inconsistências de referência de nível — Itacoatiara e Abunã</title>
+  <style>
+    :root {
+      --tinta: #1a1a1a; --tinta-2: #555; --tinta-3: #888;
+      --superficie: #fcfcfb; --cartao: #fff; --borda: #e3e1dc; --acento: #0072B2;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      color: var(--tinta); background: var(--superficie); line-height: 1.55;
+    }
+    .pagina { max-width: 900px; margin: 0 auto; padding: 36px 24px 64px; }
+    h1 { font-size: 1.5rem; margin: 0 0 6px; }
+    .subtitulo { color: var(--tinta-2); font-size: 1rem; margin: 0 0 4px; }
+    .meta { color: var(--tinta-3); font-size: 0.84rem; border-bottom: 1px solid var(--borda);
+            padding-bottom: 16px; margin-bottom: 8px; }
+    h2 { font-size: 1.18rem; margin: 34px 0 10px; border-bottom: 1px solid var(--borda); padding-bottom: 6px; }
+    h3 { font-size: 1.02rem; margin: 24px 0 8px; }
+    p, li { font-size: 0.95rem; }
+    li { margin-bottom: 8px; }
+    figure { margin: 22px 0; text-align: center; }
+    figure img { max-width: 100%; border: 1px solid var(--borda); border-radius: 8px; }
+    figcaption { font-size: 0.82rem; color: var(--tinta-3); font-style: italic; margin-top: 8px; text-align: center; }
+    table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 0.88rem; }
+    th, td { border: 1px solid var(--borda); padding: 6px 10px; text-align: left; vertical-align: top; }
+    th { background: #eef3f8; }
+    .tabela-scroll { overflow-x: auto; }
+    .nota { color: var(--tinta-3); font-size: 0.84rem; border-top: 1px solid var(--borda);
+            margin-top: 40px; padding-top: 14px; font-style: italic; }
+    strong { color: var(--tinta); }
+    @media print { body { background: #fff; } .pagina { padding: 0; } }
+  </style>
+</head>
+<body>
+<div class="pagina">
+  <h1>Inconsistências de referência de nível em estações do produto de projeções por analogia</h1>
+  <p class="subtitulo">Casos ITACOATIARA (16030000) e ABUNÃ (15320002) — análise, decisões aplicadas e pontos para discussão</p>
+  <p class="meta">Data: 09/08/2026 · Fonte de dados: data lake da ANA (Azure Synapse — banco HIDRO consistido/bruto e telemetria) · Documento de trabalho para discussão técnica</p>
+
+  <h2>1. Contexto e resumo executivo</h2>
+  <p>O produto "Projeções de Nível — Estações-Chave para Hidrovias" projeta cotas por analogia: seleciona
+  anos históricos com cota semelhante à atual no mesmo dia do calendário e projeta as trajetórias desses
+  anos até 31/dez. A validade do método depende de uma premissa silenciosa: todas as cotas da série
+  precisam estar na <strong>mesma referência de nível</strong> (zero de régua). Ao incorporar as estações
+  Itacoatiara e Manaus, essa premissa falhou em dois casos, com causas diferentes:</p>
+  <ul>
+    <li><strong>ITACOATIARA:</strong> a estação acumulou <strong>três referências de nível distintas</strong>
+    ao longo da história (1927–1944; 1997–fev/2008; mar/2008–hoje), com as fontes (consistido, bruto,
+    telemetria) migrando para o datum atual em datas diferentes (mar/2008, 2010 e out/2010, respectivamente).</li>
+    <li><strong>ABUNÃ:</strong> não há erro de dado — o enchimento da <strong>UHE Jirau</strong> (a partir de
+    out/2012) colocou a estação sob efeito de remanso, elevando as mínimas de estiagem em ~2,5–3 m de forma
+    permanente. O regime de níveis pré-Jirau não é comparável ao atual.</li>
+  </ul>
+  <p>Decisões aplicadas (configuráveis e documentadas em código): Itacoatiara passa a usar apenas
+  <strong>2009 em diante</strong> (primeiro ano civil inteiro no datum atual); Abunã, apenas
+  <strong>2014 em diante</strong> (primeiro ano civil inteiro sob remanso estabelecido). Além disso, o
+  pipeline ganhou uma <strong>sentinela automática</strong> que alerta, a cada atualização, degraus
+  sustentados anômalos nas medianas anuais de qualquer estação.</p>
+
+  <h2>2. Metodologia de detecção e diagnóstico</h2>
+  <p>O diagnóstico seguiu três etapas, aplicáveis a casos futuros:</p>
+  <ul>
+    <li><strong>(i) Auditoria fonte a fonte:</strong> separar a série por fonte (consistido nível 2, bruto
+    nível 1, telemetria) e comparar médias mensais nos períodos de sobreposição. Datum diferente entre
+    fontes aparece como diferença sistemática de mediana; nas 8 estações do produto, apenas Itacoatiara
+    acusou divergência (~8 m entre consistido e telemetria em mar/2008–out/2010).</li>
+    <li><strong>(ii) Controle de clima:</strong> para separar mudança de régua de mudança de clima/regime,
+    comparar a estação suspeita com uma estação vizinha de referência estável no período. Para Itacoatiara
+    usou-se MANAUS (14990000), no mesmo datum desde 1902: a relação (Itacoatiara − Manaus) deslocou
+    <strong>−447 cm</strong> entre as eras 1927–1944 e 2009–2025, de forma consistente mês a mês —
+    assinatura de régua, não de rio.</li>
+    <li><strong>(iii) Sentinela automática:</strong> detector de degrau sustentado nas medianas anuais
+    (janelas de 3 anos; limiar dinâmico = max(300 cm, 4× o degrau ano-a-ano típico da própria estação);
+    apenas anos com ≥300 dias de dado). Validado: detecta os dois degraus de datum de Itacoatiara na série
+    sem corte e <em>não</em> dispara em variação climática real (cheia recorde do Madeira em 2014, seca
+    recorde de 2024, década seca do Paraguai em Ladário nos anos 1960).</li>
+  </ul>
+
+  <h2>3. Caso 1 — ITACOATIARA (16030000, rio Amazonas)</h2>
+  <h3>3.1 O sintoma</h3>
+  <p>No gráfico de histórico anual do produto, as curvas formavam dois conjuntos "descolados", com um vão
+  entre eles — máximas de cheia de ~2.000–2.200 cm num conjunto e ~1.200–1.500 cm no outro (Fig. 1).
+  Amplitude e forma sazonal eram normais em ambos; apenas o patamar diferia, o que descarta hidrologia e
+  aponta para referência de nível. Note-se que as curvas da era 1927–1944 (azul) caem <em>dentro</em> da
+  moldura do conjunto atual — por isso a exclusão delas, isoladamente, não alterava o aspecto do gráfico;
+  a incompatibilidade delas só se demonstra com o controle de clima da seção 3.3.</p>
+  <figure>
+    <img src="figs/fig0_itacoatiara_sobreposicao.png" alt="Sobreposição anual de Itacoatiara com eras coloridas">
+    <figcaption>Figura 1 — O sintoma como aparecia no produto: todos os anos sobrepostos no calendário
+    jan–dez, aqui coloridos por era de referência. A queda vertical na curva verde em março é o próprio ano
+    de 2008, em que o consistido troca de datum no meio do ano.</figcaption>
+  </figure>
+  <figure>
+    <img src="figs/fig1_itacoatiara_eras.png" alt="Série integrada de Itacoatiara 1927-2026 com as três eras">
+    <figcaption>Figura 2 — Série integrada de Itacoatiara (1927–2026) com as três eras de referência
+    identificadas no tempo.</figcaption>
+  </figure>
+  <p>O hiato 1945–1996, visível na Figura 2, é real na fonte: a estação ficou desativada por ~52 anos e foi
+  reativada em 1997. Verificação: a tabela original do banco HIDRO (hidro.cotas) não tem nenhum registro da
+  estação no período, e a busca no inventário por códigos vizinhos e por nome não encontrou código
+  alternativo que cubra o intervalo (a única estação fluviométrica ITACOATIARA é a 16030000). A ressalva é
+  que isso reflete o acervo digitalizado — eventuais registros em papel do período não estão no data lake.</p>
+
+  <h3>3.2 As três referências e as datas de realinhamento por fonte</h3>
+  <p>A investigação por fonte revelou que cada fonte migrou para o datum atual em momento distinto — por
+  isso o problema não aparece de forma óbvia em nenhuma consulta isolada:</p>
+  <div class="tabela-scroll">
+  <table>
+    <tr><th>Período</th><th>Situação vs. datum atual</th><th>Evidência</th></tr>
+    <tr><td>1927–1944</td><td>lê ~4,5 m ABAIXO</td><td>Controle via Manaus: relação Ita−Man desloca −447 cm
+      entre eras, consistente mês a mês (Fig. 4)</td></tr>
+    <tr><td>1997–fev/2008 (consistido)</td><td>lê ~8 m ACIMA</td><td>Máximas 2.000–2.180 cm vs.
+      1.235–1.520 cm na era atual; telemetria da época concorda com esse patamar até fev/2008</td></tr>
+    <tr><td>mar/2008–hoje (consistido)</td><td>datum atual</td><td>Médias mensais do consistido caem ~8 m
+      entre fev e mar/2008 (Fig. 3)</td></tr>
+    <tr><td>Bruto (nível 1)</td><td>datum antigo até 2009</td><td>Realinha em 2010 (máx. 2.343 cm ainda em
+      2009)</td></tr>
+    <tr><td>Telemetria (30858250)</td><td>datum antigo até set/2010</td><td>Realinha em out/2010; de
+      mar/2008 a out/2010 diverge ~8 m do consistido (Fig. 3)</td></tr>
+  </table>
+  </div>
+  <figure>
+    <img src="figs/fig2_itacoatiara_fontes.png" alt="Médias mensais por fonte 2005-2012">
+    <figcaption>Figura 3 — Médias mensais por fonte (2005–2012): consistido migra em mar/2008; telemetria
+    só em out/2010.</figcaption>
+  </figure>
+
+  <h3>3.3 Por que os anos 1927–1944 não podem ser aproveitados</h3>
+  <p>Visualmente, as curvas de 1927–1944 caem dentro da moldura do conjunto atual — o que sugeriria
+  compatibilidade. O teste com controle de clima desfaz a impressão: usando Manaus (mesmo datum desde 1902)
+  como referência, a relação entre as duas estações mudou <strong>−447 cm</strong> entre as eras, de forma
+  consistente em todos os meses do ano. Ou seja, não foi o rio que era mais baixo: a régua da época lia
+  ~4,5 m abaixo da atual. Um ano de 1930 com "cota 600" equivaleria a ~1.050 cm na régua atual — pareá-lo
+  com anos atuais de cota 600 contaminaria a analogia.</p>
+  <figure>
+    <img src="figs/fig3_itacoatiara_controle_manaus.png" alt="Controle de clima via Manaus">
+    <figcaption>Figura 4 — Controle de clima: mediana mensal de (Itacoatiara − Manaus) por era. O
+    deslocamento ≈ −447 cm, estável mês a mês, indica régua (não rio).</figcaption>
+  </figure>
+  <p>Aproveitar 1927–1944 somando um offset (~+447 cm) é tecnicamente possível, mas não recomendado: a
+  incerteza é de ±0,5–1 m (a relação entre as estações é não linear nas águas baixas e a era antiga tem
+  meses com poucas observações), e o produto exporta memória de cálculo auditável — publicar dado oficial
+  alterado por correção própria comprometeria a auditabilidade. São ~10 anos esparsos de um século atrás,
+  com baixo ganho para a analogia do regime atual.</p>
+
+  <h3>3.4 Decisão aplicada</h3>
+  <p>Série publicada passa a iniciar em <strong>2009</strong> — primeiro ano civil inteiro no datum atual.
+  Verificação ano a ano da série resultante: 2009–2023 são 100% consistido com anos completos (sem
+  preenchimento por bruto/telemetria não realinhados, que era o risco residual em 2009–2010); 2024–2025
+  bruto já realinhado; 2026 telemetria. Máximas entre 1.235 e 1.520 cm — família única de curvas. Custo:
+  universo de analogia de 17 anos.</p>
+
+  <h2>4. Caso 2 — ABUNÃ (15320002, rio Madeira)</h2>
+  <h3>4.1 O sintoma</h3>
+  <p>A sentinela de degraus acusou <strong>+6,3 m sustentados</strong> nas medianas anuais entre 2012 e
+  2013. Diferente de Itacoatiara, a auditoria fonte a fonte <em>não</em> encontrou divergência entre
+  consistido, bruto e telemetria (medianas de diferença ~0 cm nas sobreposições) — o degrau está em todas
+  as fontes, logo não é erro de régua nem de processamento.</p>
+
+  <h3>4.2 A causa: remanso da UHE Jirau</h3>
+  <p>O padrão é fisicamente característico de remanso de reservatório: as mínimas de estiagem sobem de
+  forma permanente (faixa de 520–740 cm até 2012 para 806+ cm de 2014 em diante — nunca mais retornaram ao
+  patamar anterior, nem nas secas recordes de 2023–2024), enquanto as máximas de cheia pouco se alteram (o
+  remanso é dominante nas vazões baixas). A cronologia coincide com o enchimento da UHE Jirau, iniciado em
+  out/2012, cujo reservatório alcança a região de Abunã. 2013 é ano de transição (mínima de 647 cm, ainda
+  em elevação).</p>
+  <figure>
+    <img src="figs/fig4_abuna_jirau.png" alt="Abunã: série integrada e mínimas anuais com Jirau">
+    <figcaption>Figura 5 — Série integrada de Abunã (2005–2026) e mínimas anuais: elevação permanente de
+    ~2,5–3 m nas mínimas a partir do enchimento de Jirau (out/2012), sem mudança equivalente nas cheias.</figcaption>
+  </figure>
+  <div class="tabela-scroll">
+  <table>
+    <tr><th>Métrica (consistido)</th><th>Pré-Jirau (2005–2012)</th><th>Transição (2013)</th><th>Pós-Jirau (2014–2026)</th></tr>
+    <tr><td>Mínima anual (cm)</td><td>522 a 740</td><td>647</td><td>806 a 1.415</td></tr>
+    <tr><td>Média set–nov (cm)</td><td>708 a 914</td><td>1.021</td><td>1.037+ (2014)</td></tr>
+    <tr><td>Máxima anual (cm)</td><td>1.787 a 2.134</td><td>2.056</td><td>2.018 a 2.554</td></tr>
+  </table>
+  </div>
+
+  <h3>4.3 Decisão aplicada</h3>
+  <p>Série publicada passa a iniciar em <strong>2014</strong> — primeiro ano civil inteiro sob o regime de
+  remanso estabelecido (2013, transicional, fica fora). Justificativa: a analogia projeta justamente a
+  recessão até o fim do ano; usar anos pré-Jirau como análogos subestimaria sistematicamente os níveis de
+  estiagem projetados no regime atual. Custo: universo de analogia de 12 anos. Ponto em aberto para o
+  grupo: confirmar o ano de corte (2013 ou 2014) com quem acompanha a operação de Jirau, e avaliar se
+  variações operacionais do reservatório justificam alguma cautela adicional na leitura das projeções de
+  estiagem em Abunã.</p>
+
+  <h2>5. Situação das demais estações</h2>
+  <p>A mesma auditoria (fonte a fonte + sentinela) foi aplicada às 8 estações do produto:</p>
+  <div class="tabela-scroll">
+  <table>
+    <tr><th>Estação</th><th>Coerência entre fontes (mediana da dif.)</th><th>Degrau na série publicada</th><th>Situação</th></tr>
+    <tr><td>Itaituba</td><td>±2 cm</td><td>—</td><td>ok</td></tr>
+    <tr><td>Abunã</td><td>±0 cm</td><td>+6,3 m (2012→2013)</td><td>remanso Jirau — corte 2014</td></tr>
+    <tr><td>Porto Velho</td><td>±0 cm</td><td>—</td><td>ok</td></tr>
+    <tr><td>Tabatinga</td><td>±0 cm</td><td>—</td><td>ok</td></tr>
+    <tr><td>Ladário</td><td>±0 cm</td><td>—</td><td>ok</td></tr>
+    <tr><td>Porto Murtinho</td><td>±1 cm</td><td>—</td><td>ok</td></tr>
+    <tr><td>Itacoatiara</td><td>divergência ~8 m (pré-out/2010)</td><td>tratado</td><td>corte 2009</td></tr>
+    <tr><td>Manaus</td><td>+1 cm (80 meses de sobreposição)</td><td>—</td><td>ok — emenda
+      consistido→telemetria em 2014/2015 verificada</td></tr>
+  </table>
+  </div>
+  <p>Observação sobre Manaus: o HIDRO da estação encerra em 2014 e o período 2015–2024 é coberto pela
+  telemetria. A emenda foi validada nos 80 meses de sobreposição entre as fontes (diferença mediana de
+  +1 cm) — mesma referência.</p>
+
+  <h2>6. Pontos para discussão com o grupo</h2>
+  <ul>
+    <li><strong>Itacoatiara:</strong> existe documentação oficial (cadastro/histórico de RNs, relatórios de
+    inspeção) das mudanças de referência em 1997 e mar/2008? A confirmação documental fortaleceria o
+    racional do corte — e explicaria por que consistido, bruto e telemetria migraram em datas diferentes.</li>
+    <li><strong>Abunã:</strong> validar o ano de corte (2014) e a leitura de remanso com a equipe que
+    acompanha a UHE Jirau; avaliar se há efeito análogo em outras estações próximas a reservatórios que
+    venham a entrar no produto.</li>
+    <li><strong>Política de alertas:</strong> a sentinela hoje só alerta (WARNING no log a cada rodada,
+    2×/dia). Discutir se algum alerta deveria bloquear a publicação ou notificar ativamente.</li>
+    <li><strong>Diretriz de offsets:</strong> a decisão de NÃO corrigir eras antigas por offset (perda de
+    auditabilidade vs. ganho de histórico) vale como diretriz geral do produto?</li>
+  </ul>
+
+  <p class="nota">Anexo técnico: as consultas e verificações deste relatório foram executadas diretamente
+  no data lake da ANA (hidro.pivotcotas com MediaDiaria=1, níveis de consistência 1 e 2; hidroInfoAna.cotas
+  agregada por dia). O detector de degraus e os cortes por estação estão versionados no repositório do
+  produto (pipeline/verificacoes.py e estacoes.py), com testes automatizados. Página de circulação
+  restrita: não há link para este documento nas páginas do site.</p>
+</div>
+</body>
+</html>
