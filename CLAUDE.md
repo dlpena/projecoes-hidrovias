@@ -13,8 +13,13 @@ MANAUS —, alimentado por pipeline Python local agendado 2x/dia (10h e 14h).
   resolvida dia a dia (`compor_serie_integrada`).
 - Nos pivots do HIDRO usar apenas `cota_data`/`cota_val` (`Data`/`Hora` estão quebradas no serverless)
   e `MediaDiaria=1`. Sempre filtrar estação + período (custo por dados escaneados).
-- Cache incremental em `dados/cache/` (parquet consistido congelado + meta.json). O consistido não muda;
-  bruto e telemetria são re-buscados a cada rodada a partir de `ultima_data_consistido+1`.
+- Cache incremental em `dados/cache/` com fronteiras de congelamento INDEPENDENTES para HIDRO e
+  telemetria (`pipeline/fetch.py`, portado do projeto `[projeto local]`): HIDRO congela em
+  `{slug}_consistido.parquet`, telemetria em `{slug}_telemetria.parquet`, cada um com sua data em
+  `{slug}_meta.json` (`data_congelada_ate` / `tele_congelada_ate`). Isso corrige o caso MANAUS: o
+  HIDRO da estação parou em 2014, e um congelamento único deixaria 2015–2024 sem telemetria buscada
+  (bug real, corrigido em ago/2026 — ver `docs/relatorios/`). Rodada normal busca cada fonte só a
+  partir da própria fronteira; `--full` refaz as duas do zero.
 - O algoritmo de analogia existe em **dois espelhos que devem permanecer idênticos**:
   `pipeline/analogia.py` (fonte da verdade das regras, coberta por `tests/test_analogia.py`) e
   `docs/js/analogia.js` (site, intervalo dinâmico). O pipeline **não chama** `pipeline/analogia.py`
@@ -49,6 +54,13 @@ MANAUS —, alimentado por pipeline Python local agendado 2x/dia (10h e 14h).
 - Projeto irmão `[projeto local]` (vazão da UHE Belo Monte Montante) reusa a mesma aparência/
   algoritmo — mudanças em `docs/css`, `docs/js/grafico.js` ou nas regras de `analogia.py`/`.js` devem
   ser espelhadas lá também (ver o CLAUDE.md de lá).
+- **Relatórios técnicos não listados**: `docs/relatorios/*.html` (+ `docs/relatorios/figs/`) publicam
+  no mesmo Pages, com `<meta name="robots" content="noindex, nofollow">` e **sem link a partir de
+  nenhuma página do site** — circulam só por URL direta. Confirmar sempre com `grep -rl relatorios
+  docs/index.html docs/historico.html docs/js/*.js` antes de commitar (deve dar vazio). Versões
+  .docx de trabalho (com as mesmas figuras, geradas via skill docx) ficam em `relatorios/` na raiz
+  do repo (fora de `docs/`, mas ainda versionadas). Caso de origem: `referencias-itacoatiara-abuna`
+  (ago/2026) — auditoria fonte a fonte + controle de clima que motivou os cortes de `ano_inicio`.
 
 ## Comandos
 
