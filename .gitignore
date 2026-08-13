@@ -8,5 +8,7 @@ logs/
 relatorios/
 OPERACAO_LOCAL.md
 CLAUDE.local.md
+.claude/
+agendamento/
 *.pptx
 *.docx
