@@ -47,13 +47,6 @@ análogos. Com menos de 3 análogos o gráfico exibe aviso.
 ## Uso
 
 ```bash
-# rodada normal (incremental, todas as estações, com push)
-python atualizar.py
-
-# opções
-python atualizar.py --full --estacao itaituba   # refaz o cache de uma estação
-python atualizar.py --sem-push                  # sem publicar
-
 # testes (inclui paridade Python <-> JS do algoritmo)
 python -m pytest tests/ -q
 
@@ -61,21 +54,9 @@ python -m pytest tests/ -q
 python -m http.server --directory docs
 ```
 
-O projeto usa o venv do "app bancos ANA" (`[caminho local removido]`), que tem a
-conexão autenticada (Entra ID/MSAL) com o data lake. Se o token expirar, renove com:
-
-```bash
-python -c "from ana_datalake import connect; connect('hidro')"
-```
-
-## Agendamento (2x/dia)
-
-```powershell
-powershell -ExecutionPolicy Bypass -File agendamento\registrar_tarefa.ps1
-```
-
-Cria a tarefa `HidroviasJoaquim-Atualizar` (10:00 e 14:00). Requer usuário logado
-(o token MSAL é do perfil). Logs em `logs\`.
+A execução do pipeline (`atualizar.py`) requer acesso autenticado ao data lake
+da ANA e ambiente interno — as instruções operacionais ficam em documentação
+local, fora deste repositório.
 
 ## Internalização no ambiente ANA
 
