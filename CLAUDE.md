@@ -36,21 +36,16 @@ MANAUS —, alimentado por pipeline Python local agendado 2x/dia (10h e 14h).
   `ano_inicio` por estação corta anos não comparáveis com o regime atual — hoje: ITACOATIARA 2009
   (três referências de nível distintas na história) e ABUNÃ 2014 (remanso da UHE Jirau elevou as
   mínimas ~3 m desde o enchimento). O racional de cada corte está comentado no próprio arquivo.
-- **Sentinela de referência de nível** (`pipeline/verificacoes.py`): toda rodada compara medianas
-  anuais em janelas de 3 anos e loga WARNING se houver degrau sustentado anômalo para a estação
-  (max(300 cm, 4x o degrau ano-a-ano típico); só anos com ≥300 dias). Nasceu do caso Itacoatiara
-  (ago/2026), em que um degrau de datum de ~8 m só foi percebido visualmente — e tarde. Se o
-  alerta disparar, investigar fonte a fonte (consistido vs bruto vs telemetria em sobreposição)
-  antes de decidir `ano_inicio`; degrau real de clima/regime não deve ser cortado sem análise.
+- **Sentinela de referência de nível** (`pipeline/verificacoes.py`, ver docstring do módulo para a
+  motivação e a fórmula do limiar). Se o alerta disparar, investigar fonte a fonte (consistido vs
+  bruto vs telemetria em sobreposição) antes de decidir `ano_inicio`; degrau real de clima/regime
+  não deve ser cortado sem análise.
 - **JSON por estação é dividido em dois arquivos**: `{slug}_historico.json` (anos anteriores ao
   corrente; `exportar_json._gravar_se_mudou` só regrava se o conteúdo de fato mudou, para manter o
   blob git/ETag estável e o navegador reaproveitar cache) e `{slug}_atual.json` (só o ano corrente,
   sempre regravado). `docs/js/dados.js` busca e mescla os dois num único `doc` — todo código
   consumidor (`grafico.js`, `analogia.js`, `exportar_pdf.js`, `pagina_historico.js`) trabalha só com
   o `doc` mesclado, sem saber da divisão.
-- Duas páginas no site: `index.html` (projeções por analogia, intervalo ajustável) e
-  `historico.html` (série completa por estação com média histórica e ano vigente em destaque,
-  sem controles/exportações).
 - Projeto irmão `[projeto local]` (vazão da UHE Belo Monte Montante) reusa a mesma aparência/
   algoritmo — mudanças em `docs/css`, `docs/js/grafico.js` ou nas regras de `analogia.py`/`.js` devem
   ser espelhadas lá também (ver o CLAUDE.md de lá).
@@ -64,8 +59,6 @@ MANAUS —, alimentado por pipeline Python local agendado 2x/dia (10h e 14h).
 
 ## Comandos
 
-- Atualização completa de uma estação: `atualizar.py --full --estacao itaituba`
-- Rodada incremental normal (todas): `atualizar.py`
-- Sem push: `--sem-push`
+- Uso completo: ver docstring de `atualizar.py` (`--full`, `--estacao SLUG`, `--sem-push`)
 - Teste local do site: `python -m http.server` dentro de `docs/` (fetch não funciona via file://)
 - Testes: `python -m pytest tests/ -q`
