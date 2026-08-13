@@ -74,6 +74,15 @@ const Grafico = (() => {
     };
   }
 
+  /** Marcador sem texto embutido — o rótulo vira annotation posicionada em pixels (ver posicionarRotulos). */
+  function marcadorSemTexto(x, y, cor) {
+    return {
+      x: [x], y: [y], mode: "markers", cliponaxis: false,
+      marker: { color: cor, size: 8 },
+      hoverinfo: "skip", showlegend: false,
+    };
+  }
+
   /** Rótulo da queda para a legenda: " · queda 191 cm" (ou "subida" se negativa). */
   function rotuloQueda(r, ano) {
     const c = r.candidatos.find((c) => c.ano === ano);
@@ -104,25 +113,68 @@ const Grafico = (() => {
     return max > min ? max - min : 1;
   }
 
-  /** Posições de texto dos mínimos, evitando rótulos sobrepostos. */
+  // Rótulo isolado (sem colisão): só desloca em pixels (yshift: +acima/-abaixo), sem
+  // linha-guia — não precisa, é óbvio a quem pertence.
+  const DESLOCAMENTO_PADRAO = { comSeta: false, xshift: 0, yshift: -14 };
+
+  /**
+   * Deslocamento do k-ésimo rótulo (0 = ponto mais alto) de um cluster de `total` pontos que
+   * colidiriam entre si. Os extremos vão na vertical AFASTANDO-SE um do outro (o mais alto
+   * sobe, o mais baixo desce), sem linha-guia. Os do meio vão na diagonal E ganham uma
+   * linha-guia curta até o marcador (ax/ay, convenção do Plotly: ay negativo = acima) — só o
+   * deslocamento não bastava: "de lado" cai em cima da linha pontilhada, e longe demais sem
+   * guia parece "solto" do ponto.
+   */
+  function deslocamentoDoCluster(k, total) {
+    if (k === 0) return { comSeta: false, xshift: 0, yshift: 18 };           // mais alto: acima
+    if (k === total - 1) return { comSeta: false, xshift: 0, yshift: -18 };  // mais baixo: abaixo
+    return { comSeta: true, ax: k % 2 === 1 ? 24 : -24, ay: -14 };           // meio: diagonal + guia
+  }
+
+  /**
+   * Agrupa mínimos que colidiriam visualmente (próximos em data e em valor) e devolve,
+   * por índice, o deslocamento em pixels do rótulo — garantindo separação mesmo quando os
+   * mínimos praticamente coincidem em x/y (ex.: maior/menor queda e média a poucos cm/m³ e
+   * poucos dias um do outro).
+   */
   function posicionarRotulos(minimos, amplitudeY) {
     const limY = amplitudeY * 0.07;
-    const pos = minimos.map(() => "bottom center");
-    for (let i = 0; i < minimos.length; i++) {
-      for (let j = i + 1; j < minimos.length; j++) {
+    const n = minimos.length;
+    const adjacentes = Array.from({ length: n }, () => []);
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
         const dDias = Math.abs(new Date(minimos[i].x) - new Date(minimos[j].x)) / 864e5;
         if (dDias < 20 && Math.abs(minimos[i].y - minimos[j].y) < limY) {
-          const cima = minimos[i].y >= minimos[j].y ? i : j;
-          pos[cima] = pos[cima] === "top center" ? "middle right" : "top center";
+          adjacentes[i].push(j);
+          adjacentes[j].push(i);
         }
       }
     }
-    return pos;
+    const deslocamentos = minimos.map(() => DESLOCAMENTO_PADRAO);
+    const visitado = new Array(n).fill(false);
+    for (let i = 0; i < n; i++) {
+      if (visitado[i]) continue;
+      const cluster = [i];
+      visitado[i] = true;
+      for (let k = 0; k < cluster.length; k++) {
+        for (const viz of adjacentes[cluster[k]]) {
+          if (!visitado[viz]) { visitado[viz] = true; cluster.push(viz); }
+        }
+      }
+      if (cluster.length > 1) {
+        cluster.sort((a, b) => minimos[b].y - minimos[a].y); // mais alto primeiro
+        cluster.forEach((idx, k) => {
+          deslocamentos[idx] = deslocamentoDoCluster(k, cluster.length);
+        });
+      }
+    }
+    return deslocamentos;
   }
 
   function montarTraces(doc, r) {
     const datas = datasDoAno(r.ano_atual);
     const traces = [];
+    const anotacoesMinimos = [];
 
     // trajetórias deslocadas dos anos análogos, apenas após o dia D (fundo)
     if (r.trajetorias) {
@@ -168,12 +220,23 @@ const Grafico = (() => {
         const { min, dataMin } = minimoTrajetoria(serie, datas, r.idx_d);
         if (min !== null) minimos.push({ x: dataMin, y: min, cor });
       }
-      const posicoes = posicionarRotulos(minimos, faixaY(doc, r));
+      const deslocamentos = posicionarRotulos(minimos, faixaY(doc, r));
       minimos.forEach((m, i) => {
-        traces.push(marcador(m.x, m.y, String(Math.round(m.y)), m.cor, posicoes[i]));
+        traces.push(marcadorSemTexto(m.x, m.y, m.cor));
+        const d = deslocamentos[i];
+        anotacoesMinimos.push({
+          x: m.x, y: m.y, xref: "x", yref: "y",
+          text: String(Math.round(m.y)),
+          xanchor: "center", yanchor: "middle",
+          font: { size: 11, color: m.cor, family: "Segoe UI, system-ui, sans-serif" },
+          ...(d.comSeta
+            ? { showarrow: true, ax: d.ax, ay: d.ay, axref: "pixel", ayref: "pixel",
+                arrowhead: 0, arrowwidth: 1, arrowcolor: m.cor, standoff: 3 }
+            : { showarrow: false, xshift: d.xshift, yshift: d.yshift }),
+        });
       });
     }
-    return { traces, datas };
+    return { traces, datas, anotacoesMinimos };
   }
 
   function layoutBase(doc, r) {
@@ -339,8 +402,10 @@ const Grafico = (() => {
     function render() {
       const r = Analogia.calcular(doc, estado.range, estado.modo);
       estado.resultado = r;
-      const { traces } = montarTraces(doc, r);
-      Plotly.react(el.grafico, traces, layoutBase(doc, r), CONFIG);
+      const { traces, anotacoesMinimos } = montarTraces(doc, r);
+      const layout = layoutBase(doc, r);
+      layout.annotations = layout.annotations.concat(anotacoesMinimos);
+      Plotly.react(el.grafico, traces, layout, CONFIG);
       el.contagem.textContent = String(r.selecionados.length);
       el.aviso.textContent = r.aviso || "";
       el.rodape.textContent = r.selecionados.length
