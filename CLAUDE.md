@@ -6,15 +6,13 @@ MANAUS —, alimentado por pipeline Python local agendado 2x/dia (10h e 14h).
 
 ## Regras do projeto
 
-- **Nunca reimplementar a conexão com o data lake da ANA.** Reusar `ana_datalake` e `ana_app.queries`
-  do projeto `..\app bancos ANA` (o `pipeline/__init__.py` faz o `sys.path.insert`). Rodar sempre com o
-  venv de lá: `[caminho local removido]\Scripts\python.exe`.
+As regras que dependem do ambiente local (conexão com o data lake, venv, projetos
+irmãos) ficam em `CLAUDE.local.md`, não versionado.
+
 - Cota em **cm** (HIDRO e telemetria). Série integrada: consistido (nível 2) > bruto (nível 1) > telemetria,
   resolvida dia a dia (`compor_serie_integrada`).
-- Nos pivots do HIDRO usar apenas `cota_data`/`cota_val` (`Data`/`Hora` estão quebradas no serverless)
-  e `MediaDiaria=1`. Sempre filtrar estação + período (custo por dados escaneados).
 - Cache incremental em `dados/cache/` com fronteiras de congelamento INDEPENDENTES para HIDRO e
-  telemetria (`pipeline/fetch.py`, portado do projeto `[projeto local]`): HIDRO congela em
+  telemetria (`pipeline/fetch.py`): HIDRO congela em
   `{slug}_consistido.parquet`, telemetria em `{slug}_telemetria.parquet`, cada um com sua data em
   `{slug}_meta.json` (`data_congelada_ate` / `tele_congelada_ate`). Isso corrige o caso MANAUS: o
   HIDRO da estação parou em 2014, e um congelamento único deixaria 2015–2024 sem telemetria buscada
@@ -46,9 +44,6 @@ MANAUS —, alimentado por pipeline Python local agendado 2x/dia (10h e 14h).
   sempre regravado). `docs/js/dados.js` busca e mescla os dois num único `doc` — todo código
   consumidor (`grafico.js`, `analogia.js`, `exportar_pdf.js`, `pagina_historico.js`) trabalha só com
   o `doc` mesclado, sem saber da divisão.
-- Projeto irmão `[projeto local]` (vazão da UHE Belo Monte Montante) reusa a mesma aparência/
-  algoritmo — mudanças em `docs/css`, `docs/js/grafico.js` ou nas regras de `analogia.py`/`.js` devem
-  ser espelhadas lá também (ver o CLAUDE.md de lá).
 - **Relatórios técnicos não listados**: `docs/relatorios/*.html` (+ `docs/relatorios/figs/`) publicam
   no mesmo Pages, com `<meta name="robots" content="noindex, nofollow">` e **sem link a partir de
   nenhuma página do site** — circulam só por URL direta. Confirmar sempre com `grep -rl relatorios
