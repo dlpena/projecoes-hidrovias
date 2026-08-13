@@ -4,3 +4,7 @@ dados/cache/
 logs/
 .venv/
 *.tmp
+# material de trabalho local — não versionar (docs/relatorios/ é a versão publicada)
+relatorios/
+*.pptx
+*.docx

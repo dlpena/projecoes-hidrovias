@@ -54,7 +54,8 @@ MANAUS —, alimentado por pipeline Python local agendado 2x/dia (10h e 14h).
   nenhuma página do site** — circulam só por URL direta. Confirmar sempre com `grep -rl relatorios
   docs/index.html docs/historico.html docs/js/*.js` antes de commitar (deve dar vazio). Versões
   .docx de trabalho (com as mesmas figuras, geradas via skill docx) ficam em `relatorios/` na raiz
-  do repo (fora de `docs/`, mas ainda versionadas). Caso de origem: `referencias-itacoatiara-abuna`
+  do repo, **fora do versionamento** (`relatorios/`, `*.docx` e `*.pptx` estão no .gitignore —
+  material de trabalho local não vai para o repo público). Caso de origem: `referencias-itacoatiara-abuna`
   (ago/2026) — auditoria fonte a fonte + controle de clima que motivou os cortes de `ano_inicio`.
 
 ## Comandos
