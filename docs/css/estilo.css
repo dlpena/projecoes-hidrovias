@@ -8,6 +8,8 @@
   --acento: #0072B2;
   --aviso-fundo: #fff7e6;
   --aviso-borda: #e6c46e;
+  --ponto-controle-1: #C0392B;
+  --ponto-controle-2: #E0A526;
 }
 
 * { box-sizing: border-box; }
@@ -113,6 +115,29 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
   color: #fff;
 }
 .contagem { font-weight: 600; color: var(--tinta); }
+
+.controles-referencia {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  align-items: center;
+  margin: 0 0 4px;
+  font-size: 0.86rem;
+  color: var(--tinta-2);
+}
+.controles-referencia label { display: flex; align-items: center; gap: 6px; }
+.controles-referencia input[type="number"] {
+  width: 74px;
+  padding: 2px 6px;
+  border: 1px solid var(--borda);
+  border-radius: 6px;
+  font: inherit;
+  color: var(--tinta);
+}
+.controles-referencia input.ctl-pc1 { border-color: var(--ponto-controle-1); color: var(--ponto-controle-1); }
+.controles-referencia input.ctl-pc2 { border-color: var(--ponto-controle-2); color: var(--ponto-controle-2); }
+.controles-referencia input.ctl-pc1::placeholder,
+.controles-referencia input.ctl-pc2::placeholder { color: var(--tinta-3); }
 .acoes { margin-left: auto; display: flex; gap: 6px; }
 .botao-csv {
   display: inline-block;

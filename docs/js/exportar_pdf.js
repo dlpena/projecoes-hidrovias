@@ -106,14 +106,23 @@ const ExportarPDF = (() => {
 
     y = tituloSecao(pdf, "1. Parâmetros", y);
     const dataD = r.dia_d.split("-").reverse().join("/");
+    const linhasParametros = [
+      ["Dia D (último dado)", `${dataD} (${docE.fonte_ultimo_dado})`,
+       "Cota atual", `${fmt(r.cota_atual, 0)} cm`],
+      ["Intervalo (cota atual ±)", t(`${rotuloRange(r)} — o ajustado na tela (equivale a ±${fmt(r.limite_cm)} cm)`),
+       "Anos análogos", String(r.selecionados.length)],
+    ];
+    const temPc1 = r.pc1 !== null && r.pc1 !== undefined;
+    const temPc2 = r.pc2 !== null && r.pc2 !== undefined;
+    if (temPc1 || temPc2) {
+      linhasParametros.push([
+        "Ponto de controle 1", temPc1 ? `${fmt(r.pc1, 0)} cm` : "—",
+        "Ponto de controle 2", temPc2 ? `${fmt(r.pc2, 0)} cm` : "—",
+      ]);
+    }
     pdf.autoTable({
       ...GRADE, startY: y,
-      body: [
-        ["Dia D (último dado)", `${dataD} (${docE.fonte_ultimo_dado})`,
-         "Cota atual", `${fmt(r.cota_atual, 0)} cm`],
-        ["Intervalo (cota atual ±)", t(`${rotuloRange(r)} — o ajustado na tela (equivale a ±${fmt(r.limite_cm)} cm)`),
-         "Anos análogos", String(r.selecionados.length)],
-      ],
+      body: linhasParametros,
       columnStyles: { 0: { fontStyle: "bold", cellWidth: 40 }, 2: { fontStyle: "bold", cellWidth: 30 } },
     });
     y = pdf.lastAutoTable.finalY + 3;

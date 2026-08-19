@@ -11,6 +11,8 @@ const Grafico = (() => {
     anoAnalogo: "#b5b5b5",
     anoComum: "#e4e4e4",
     diaD: "#888",
+    pontoControle1: "#C0392B",
+    pontoControle2: "#E0A526",
   };
   const MESES = ["jan", "fev", "mar", "abr", "mai", "jun",
                  "jul", "ago", "set", "out", "nov", "dez"];
@@ -239,9 +241,35 @@ const Grafico = (() => {
     return { traces, datas, anotacoesMinimos };
   }
 
-  function layoutBase(doc, r) {
+  /** Linhas horizontais e rótulos dos pontos de controle (cotas de referência definidas pelo usuário). */
+  function shapesPontosControle(pontos) {
+    const shapes = [];
+    const anotacoes = [];
+    const defs = [
+      { valor: pontos.pc1, cor: CORES.pontoControle1, nome: "Ponto de controle 1" },
+      { valor: pontos.pc2, cor: CORES.pontoControle2, nome: "Ponto de controle 2" },
+    ];
+    for (const d of defs) {
+      if (d.valor === null || d.valor === undefined || !isFinite(d.valor)) continue;
+      shapes.push({
+        type: "line", xref: "paper", yref: "y",
+        x0: 0, x1: 1, y0: d.valor, y1: d.valor,
+        line: { color: d.cor, width: 1.5 },
+      });
+      anotacoes.push({
+        x: 1, xref: "paper", y: d.valor, yref: "y",
+        text: d.nome, showarrow: false,
+        xanchor: "left", yanchor: "middle", xshift: 8,
+        font: { size: 11, color: d.cor, family: "Segoe UI, system-ui, sans-serif" },
+      });
+    }
+    return { shapes, anotacoes };
+  }
+
+  function layoutBase(doc, r, pontos) {
+    const { shapes: shapesPC, anotacoes: anotacoesPC } = shapesPontosControle(pontos || {});
     return {
-      margin: { l: 58, r: 16, t: 8, b: 34 },
+      margin: { l: 58, r: shapesPC.length ? 150 : 16, t: 8, b: 34 },
       separators: ",.",
       paper_bgcolor: "rgba(0,0,0,0)",
       plot_bgcolor: "rgba(0,0,0,0)",
@@ -272,13 +300,13 @@ const Grafico = (() => {
         type: "line", xref: "x", yref: "paper",
         x0: r.dia_d, x1: r.dia_d, y0: 0, y1: 1,
         line: { color: CORES.diaD, width: 1, dash: "dot" },
-      }],
+      }, ...shapesPC],
       annotations: [{
         x: r.dia_d, xref: "x", y: 1, yref: "paper",
         text: `último dado ${formatarDataBR(r.dia_d)}`,
         showarrow: false, yanchor: "bottom", xanchor: "left",
         font: { size: 10.5, color: "#888" },
-      }],
+      }, ...anotacoesPC],
     };
   }
 
@@ -297,6 +325,8 @@ const Grafico = (() => {
     L.push(`Dados atualizados em;${formatarDataBR(doc.ultima_data)};fonte do último dado;${doc.fonte_ultimo_dado}`);
     L.push(`Dia D;${formatarDataBR(r.dia_d)};Cota atual (cm);${numeroBR(r.cota_atual, 0)}`);
     L.push(`Intervalo (cota atual ±);${numeroBR(r.range_valor)} ${r.modo === "cm" ? "cm" : "%"};equivalente em cm;±${numeroBR(r.limite_cm)}`);
+    if (r.pc1 !== null && r.pc1 !== undefined) L.push(`Ponto de controle 1 (cm);${numeroBR(r.pc1, 0)}`);
+    if (r.pc2 !== null && r.pc2 !== undefined) L.push(`Ponto de controle 2 (cm);${numeroBR(r.pc2, 0)}`);
     L.push(`Regras;tolerância ±3 dias no dia D;cobertura pós-D ≥80% e dado nos últimos 10 dias do ano`);
     L.push("");
     L.push("BLOCO 1 — Anos candidatos (universo completo e seleção)");
@@ -375,6 +405,16 @@ const Grafico = (() => {
           <button type="button" class="botao-csv botao-sec" title="Memória de cálculo em CSV com o intervalo ajustado nos controles">CSV</button>
         </span>
       </div>
+      <div class="controles-referencia">
+        <label title="Linha horizontal de referência desenhada no gráfico (ex.: cota mínima navegável).">
+          Cota do Ponto de controle 1
+          <input type="number" step="1" class="ctl-pc1" placeholder="cm">
+          <span>cm</span></label>
+        <label title="Linha horizontal de referência desenhada no gráfico.">
+          Cota do Ponto de controle 2
+          <input type="number" step="1" class="ctl-pc2" placeholder="cm">
+          <span>cm</span></label>
+      </div>
       <p class="aviso"></p>
       <div class="grafico"></div>
       <p class="estacao-rodape"></p>`;
@@ -391,10 +431,12 @@ const Grafico = (() => {
       grafico: sec.querySelector(".grafico"),
       rodape: sec.querySelector(".estacao-rodape"),
       csv: sec.querySelector(".botao-sec"),
+      pc1: sec.querySelector(".ctl-pc1"),
+      pc2: sec.querySelector(".ctl-pc2"),
     };
     // intervalo inicial: o menor (≥50 cm) que contém pelo menos 3 anos análogos
     const rangeAuto = Analogia.rangeInicial(doc);
-    const estado = { range: rangeAuto, modo: "cm", resultado: null };
+    const estado = { range: rangeAuto, modo: "cm", resultado: null, pc1: null, pc2: null };
     if (rangeAuto > 500) el.slider.max = String(Math.ceil(rangeAuto * 2));
     el.slider.value = String(rangeAuto);
     el.num.value = String(rangeAuto);
@@ -403,7 +445,7 @@ const Grafico = (() => {
       const r = Analogia.calcular(doc, estado.range, estado.modo);
       estado.resultado = r;
       const { traces, anotacoesMinimos } = montarTraces(doc, r);
-      const layout = layoutBase(doc, r);
+      const layout = layoutBase(doc, r, { pc1: estado.pc1, pc2: estado.pc2 });
       layout.annotations = layout.annotations.concat(anotacoesMinimos);
       Plotly.react(el.grafico, traces, layout, CONFIG);
       el.contagem.textContent = String(r.selecionados.length);
@@ -454,12 +496,29 @@ const Grafico = (() => {
     }
     el.btnCm.addEventListener("click", () => trocarModo("cm"));
     el.btnPct.addEventListener("click", () => trocarModo("pct"));
-    sec.querySelector(".botao-memoria").addEventListener("click", () => {
+
+    function lerPontoControle(input) {
+      const v = Number(input.value);
+      return input.value !== "" && isFinite(v) ? v : null;
+    }
+    el.pc1.addEventListener("input", () => {
+      estado.pc1 = lerPontoControle(el.pc1);
+      agendarRender();
+    });
+    el.pc2.addEventListener("input", () => {
+      estado.pc2 = lerPontoControle(el.pc2);
+      agendarRender();
+    });
+
+    function resultadoComPontosControle() {
       const r = estado.resultado || Analogia.calcular(doc, estado.range, estado.modo);
-      ExportarPDF.gerarMemoria(doc, r);
+      return { ...r, pc1: estado.pc1, pc2: estado.pc2 };
+    }
+    sec.querySelector(".botao-memoria").addEventListener("click", () => {
+      ExportarPDF.gerarMemoria(doc, resultadoComPontosControle());
     });
     el.csv.addEventListener("click", () => {
-      const r = estado.resultado || Analogia.calcular(doc, estado.range, estado.modo);
+      const r = resultadoComPontosControle();
       baixarCSV(`analogia_${doc.slug}_${doc.ultima_data}.csv`, gerarCSV(doc, r));
     });
 
