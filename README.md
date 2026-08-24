@@ -1,8 +1,8 @@
 # Hidrovias Joaquim — Projeções de cota por analogia
 
-Site estático com projeções de nível d'água para 8 estações fluviométricas
-(Itaituba, Abunã, Porto Velho, Tabatinga, Ladário, Porto Murtinho, Itacoatiara
-e Manaus), alimentado pelo data lake da ANA via pipeline local.
+Site estático com projeções de nível d'água para 9 estações fluviométricas
+(Itaituba, Abunã, Porto Velho, Humaitá, Tabatinga, Ladário, Porto Murtinho,
+Itacoatiara e Manaus), alimentado pelo data lake da ANA via pipeline local.
 
 ## Como funciona
 
@@ -22,7 +22,7 @@ e Manaus), alimentado pelo data lake da ANA via pipeline local.
    - **Projeções** (`index.html`): o cálculo da analogia roda no navegador, então
      o intervalo (± cm ou %) é ajustável com resposta imediata. Todas as
      exportações são geradas na hora, refletindo o que está na tela — PDF do
-     conjunto (capa + 8 gráficos como visualizados), memória de cálculo em PDF
+     conjunto (capa + todos os gráficos como visualizados), memória de cálculo em PDF
      por estação (parâmetros, cobertura por fonte, anos candidatos, projeções e
      série dia a dia) e CSV.
    - **Histórico completo** (`historico.html`): todos os anos de cada estação

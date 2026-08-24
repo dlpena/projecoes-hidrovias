@@ -1,8 +1,8 @@
 # Hidrovias Joaquim
 
-Site estático (GitHub Pages, `docs/` na main) com projeções de cota por analogia para 8 estações
-fluviométricas — ITAITUBA, ABUNÃ, PORTO VELHO, TABATINGA, LADÁRIO, PORTO MURTINHO, ITACOATIARA,
-MANAUS —, alimentado por pipeline Python local agendado 2x/dia (10h e 14h).
+Site estático (GitHub Pages, `docs/` na main) com projeções de cota por analogia para 9 estações
+fluviométricas — ITAITUBA, ABUNÃ, PORTO VELHO, HUMAITÁ, TABATINGA, LADÁRIO, PORTO MURTINHO,
+ITACOATIARA, MANAUS —, alimentado por pipeline Python local agendado 2x/dia (10h e 14h).
 
 ## Regras do projeto
 
@@ -32,8 +32,9 @@ irmãos) ficam em `CLAUDE.local.md`, não versionado.
   continuam em inglês/português técnico, sem relação com o texto exibido.
 - Estações: definidas apenas em `estacoes.py` (o site lê `docs/dados/indice.json` gerado dali).
   `ano_inicio` por estação corta anos não comparáveis com o regime atual — hoje: ITACOATIARA 2009
-  (três referências de nível distintas na história) e ABUNÃ 2014 (remanso da UHE Jirau elevou as
-  mínimas ~3 m desde o enchimento). O racional de cada corte está comentado no próprio arquivo.
+  (três referências de nível distintas na história), ABUNÃ 2014 (remanso da UHE Jirau elevou as
+  mínimas ~3 m desde o enchimento) e HUMAITÁ 1968 (série 1931-1948 em referência ~7-9 m abaixo da
+  atual, separada por lacuna de 18 anos). O racional de cada corte está comentado no próprio arquivo.
 - **Sentinela de referência de nível** (`pipeline/verificacoes.py`, ver docstring do módulo para a
   motivação e a fórmula do limiar). Se o alerta disparar, investigar fonte a fonte (consistido vs
   bruto vs telemetria em sobreposição) antes de decidir `ano_inicio`; degrau real de clima/regime

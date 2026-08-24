@@ -17,6 +17,17 @@ ESTACOES = [
      "ano_inicio": 2014},
     {"slug": "porto-velho", "nome": "PORTO VELHO", "rio": "Madeira",
      "estcodigo_telemetria": 84863570, "codigo_hidroweb": 15400000},
+    # ano_inicio 1968: a série 1931-1948 lê ~7-9 m ABAIXO da referência atual —
+    # a relação Humaitá-Manaus (Manaus no mesmo datum desde 1902 como controle
+    # de clima) mudou +922 cm entre as eras, separadas por lacuna de 18 anos
+    # (1949-1967) que impede verificação por sobreposição. Degrau sustentado
+    # dessa magnitude é mudança de régua/datum, não clima. A era 1968+ é
+    # internamente consistente (consistido, bruto e telemetria concordam com
+    # mediana de diferença 0 cm na sobreposição). 1967 é ano parcial (258 dias);
+    # 1968 é o primeiro ano civil completo na referência atual.
+    {"slug": "humaita", "nome": "HUMAITÁ", "rio": "Madeira",
+     "estcodigo_telemetria": 73063010, "codigo_hidroweb": 15630000,
+     "ano_inicio": 1968},
     {"slug": "tabatinga", "nome": "TABATINGA", "rio": "Solimões",
      "estcodigo_telemetria": 41469570, "codigo_hidroweb": 10100000},
     {"slug": "ladario", "nome": "LADÁRIO (BASE NAVAL)", "rio": "Paraguai",
