@@ -66,6 +66,40 @@ const Grafico = (() => {
     return { min, dataMin };
   }
 
+  /**
+   * Toques da trajetória na cota `alvo` a partir do dia D (data interpolada linearmente
+   * entre os dois dias vizinhos do cruzamento). `entrada` = primeiro cruzamento em queda,
+   * `saida` = primeiro cruzamento em subida depois da entrada — se a trajetória já começa
+   * abaixo do alvo, só há saída. null quando o toque não ocorre até 31/dez.
+   */
+  function cruzamentosTrajetoria(serie, datas, idxD, alvo) {
+    const toques = [];
+    let anterior = null; // { data, valor }
+    for (let i = idxD; i < 366; i++) {
+      if (datas[i] === null || serie[i] === null || serie[i] === undefined) continue;
+      const valor = serie[i];
+      if (anterior !== null && valor !== anterior.valor) {
+        const a = anterior.valor - alvo, b = valor - alvo;
+        if (a === 0 && (!toques.length || toques[toques.length - 1].data !== anterior.data)) {
+          toques.push({ data: anterior.data, sentido: b < 0 ? "entrada" : "saida" });
+        } else if ((a > 0 && b <= 0) || (a < 0 && b >= 0)) {
+          const frac = a / (a - b);
+          const t0 = new Date(`${anterior.data}T00:00:00`).getTime();
+          const t1 = new Date(`${datas[i]}T00:00:00`).getTime();
+          toques.push({
+            data: new Date(t0 + frac * (t1 - t0)).toISOString().slice(0, 10),
+            sentido: a > 0 ? "entrada" : "saida",
+          });
+        }
+      }
+      anterior = { data: datas[i], valor };
+    }
+    const iEntrada = toques.findIndex((t) => t.sentido === "entrada");
+    const entrada = iEntrada >= 0 ? toques[iEntrada] : null;
+    const saida = toques.slice(iEntrada + 1).find((t) => t.sentido === "saida") || null;
+    return { entrada, saida };
+  }
+
   function marcador(x, y, texto, cor, posicao) {
     return {
       x: [x], y: [y], mode: "markers+text", text: [texto],
@@ -77,11 +111,29 @@ const Grafico = (() => {
   }
 
   /** Marcador sem texto embutido — o rótulo vira annotation posicionada em pixels (ver posicionarRotulos). */
-  function marcadorSemTexto(x, y, cor) {
+  function marcadorSemTexto(x, y, cor, simbolo = "circle") {
     return {
       x: [x], y: [y], mode: "markers", cliponaxis: false,
-      marker: { color: cor, size: 8 },
+      marker: { color: cor, size: 8, symbol: simbolo },
       hoverinfo: "skip", showlegend: false,
+    };
+  }
+
+  /**
+   * Annotation de rótulo posicionada em pixels a partir do deslocamento calculado por
+   * posicionarRotulos. `chip` desenha um fundo branco semi-opaco atrás do texto — essencial
+   * quando o rótulo pode cair sobre o feixe de curvas cinzas dos anos análogos.
+   */
+  function rotuloPonto(x, y, texto, cor, deslocamento, chip = false) {
+    return {
+      x, y, xref: "x", yref: "y", text: texto,
+      xanchor: "center", yanchor: "middle",
+      font: { size: 11, color: cor, family: "Segoe UI, system-ui, sans-serif" },
+      ...(chip ? { bgcolor: "rgba(255,255,255,0.92)", borderpad: 1 } : {}),
+      ...(deslocamento.comSeta
+        ? { showarrow: true, ax: deslocamento.ax, ay: deslocamento.ay, axref: "pixel", ayref: "pixel",
+            arrowhead: 0, arrowwidth: 1, arrowcolor: cor, standoff: 3 }
+        : { showarrow: false, xshift: deslocamento.xshift, yshift: deslocamento.yshift }),
     };
   }
 
@@ -173,10 +225,79 @@ const Grafico = (() => {
     return deslocamentos;
   }
 
-  function montarTraces(doc, r) {
+  /**
+   * Marcadores + rótulos "dd/mm" de onde as 3 projeções tocam os pontos de controle (a cota
+   * do toque é a do próprio PC, então só a data interessa).
+   * Triângulo p/ baixo = toque de entrada (curva caindo), p/ cima = toque de saída (subindo).
+   * O rótulo desloca-se na VERTICAL a partir do toque, com linha-guia reta, e o lado é dado
+   * pela curva: maior queda ABAIXO (é a curva mais baixa — embaixo dela há menos traçado),
+   * menor queda ACIMA (curva mais alta), média no primeiro lado livre. As curvas de lado fixo
+   * são posicionadas antes para a média se encaixar por último.
+   */
+  function tracesCruzamentosControle(r, datas, pontos, amplitudeY, larguraGrafico) {
+    const traces = [];
+    const anotacoes = [];
+    const tj = r.trajetorias;
+    const curvas = [
+      [tj.maior_queda, CORES.maiorQueda, "maior"],
+      [tj.menor_queda, CORES.menorQueda, "menor"],
+      [tj.media, CORES.media, "media"],
+    ];
+    const toques = [];
+    for (const alvo of [pontos.pc1, pontos.pc2]) {
+      if (alvo === null || alvo === undefined || !isFinite(alvo)) continue;
+      for (const [serie, cor, curva] of curvas) {
+        const { entrada, saida } = cruzamentosTrajetoria(serie, datas, r.idx_d, alvo);
+        if (entrada) toques.push({ x: entrada.data, y: alvo, cor, curva, sentido: "entrada" });
+        if (saida) toques.push({ x: saida.data, y: alvo, cor, curva, sentido: "saida" });
+      }
+    }
+    // média por último; dentro de cada grupo, por data (estabiliza a anticolisão)
+    toques.sort((a, b) =>
+      (a.curva === "media") - (b.curva === "media") || new Date(a.x) - new Date(b.x));
+    // Anticolisão em pixels estimados nos dois eixos: px/dia sai da largura do plot (margens
+    // l=58 e r=70 descontadas) e px/cm da altura útil (~396px) sobre a amplitude com a folga
+    // do autorange (~6% por lado). Cada rótulo (~36x17px com o chip) pega o menor nível livre
+    // no seu lado, afastando-se da linha 19px por nível (+1 = abaixo na tela, -1 = acima).
+    const pxDia = Math.max(1.5, ((larguraGrafico || 1100) - 128) / 366);
+    const pxCm = 396 / (amplitudeY * 1.12);
+    const diaAno = (iso) =>
+      (new Date(`${iso}T00:00:00`) - new Date(`${r.ano_atual}-01-01T00:00:00`)) / 864e5;
+    const cx = toques.map((p) => diaAno(p.x) * pxDia);
+    const LADO_FIXO = { maior: 1, menor: -1 };
+    const pos = toques.map(() => null); // { dir, nivel } depois de posicionado
+    const sRotulo = (y, dir, n) => -y * pxCm + dir * (20 + n * 19);
+    const livre = (i, dir, n) => {
+      for (let j = 0; j < toques.length; j++) {
+        if (j === i || pos[j] === null) continue;
+        if (Math.abs(cx[i] - cx[j]) < 46 &&
+            Math.abs(sRotulo(toques[i].y, dir, n) -
+                     sRotulo(toques[j].y, pos[j].dir, pos[j].nivel)) < 18) return false;
+      }
+      return true;
+    };
+    toques.forEach((p, i) => {
+      const lados = p.curva === "media" ? [-1, 1] : [LADO_FIXO[p.curva]];
+      busca: for (let n = 0; ; n++) {
+        for (const dir of lados) {
+          if (livre(i, dir, n)) { pos[i] = { dir, nivel: n }; break busca; }
+        }
+      }
+    });
+    toques.forEach((p, i) => {
+      traces.push(marcadorSemTexto(p.x, p.y, p.cor,
+                                   p.sentido === "entrada" ? "triangle-down" : "triangle-up"));
+      anotacoes.push(rotuloPonto(
+        p.x, p.y, formatarDataBR(p.x).slice(0, 5), p.cor,
+        { comSeta: true, ax: 0, ay: pos[i].dir * (20 + pos[i].nivel * 19) }, true));
+    });
+    return { traces, anotacoes };
+  }
+
+  function montarTraces(doc, r, pontos, larguraGrafico) {
     const datas = datasDoAno(r.ano_atual);
     const traces = [];
-    const anotacoesMinimos = [];
+    const anotacoesRotulos = [];
 
     // trajetórias deslocadas dos anos análogos, apenas após o dia D (fundo)
     if (r.trajetorias) {
@@ -213,6 +334,7 @@ const Grafico = (() => {
                          CORES.observado, "top center"));
     if (r.trajetorias) {
       const tj = r.trajetorias;
+      const amplitudeY = faixaY(doc, r);
       const minimos = [];
       for (const [serie, cor] of [
         [tj.maior_queda, CORES.maiorQueda],
@@ -222,23 +344,18 @@ const Grafico = (() => {
         const { min, dataMin } = minimoTrajetoria(serie, datas, r.idx_d);
         if (min !== null) minimos.push({ x: dataMin, y: min, cor });
       }
-      const deslocamentos = posicionarRotulos(minimos, faixaY(doc, r));
+      const deslocamentos = posicionarRotulos(minimos, amplitudeY);
       minimos.forEach((m, i) => {
         traces.push(marcadorSemTexto(m.x, m.y, m.cor));
-        const d = deslocamentos[i];
-        anotacoesMinimos.push({
-          x: m.x, y: m.y, xref: "x", yref: "y",
-          text: String(Math.round(m.y)),
-          xanchor: "center", yanchor: "middle",
-          font: { size: 11, color: m.cor, family: "Segoe UI, system-ui, sans-serif" },
-          ...(d.comSeta
-            ? { showarrow: true, ax: d.ax, ay: d.ay, axref: "pixel", ayref: "pixel",
-                arrowhead: 0, arrowwidth: 1, arrowcolor: m.cor, standoff: 3 }
-            : { showarrow: false, xshift: d.xshift, yshift: d.yshift }),
-        });
+        anotacoesRotulos.push(rotuloPonto(m.x, m.y, String(Math.round(m.y)), m.cor, deslocamentos[i]));
       });
+
+      const { traces: tracesCruz, anotacoes: anotacoesCruz } =
+        tracesCruzamentosControle(r, datas, pontos || {}, amplitudeY, larguraGrafico);
+      traces.push(...tracesCruz);
+      anotacoesRotulos.push(...anotacoesCruz);
     }
-    return { traces, datas, anotacoesMinimos };
+    return { traces, datas, anotacoesRotulos };
   }
 
   /** Linhas horizontais e rótulos dos pontos de controle (cotas de referência definidas pelo usuário). */
@@ -246,8 +363,8 @@ const Grafico = (() => {
     const shapes = [];
     const anotacoes = [];
     const defs = [
-      { valor: pontos.pc1, cor: CORES.pontoControle1, nome: "Ponto de controle 1" },
-      { valor: pontos.pc2, cor: CORES.pontoControle2, nome: "Ponto de controle 2" },
+      { valor: pontos.pc1, cor: CORES.pontoControle1 },
+      { valor: pontos.pc2, cor: CORES.pontoControle2 },
     ];
     for (const d of defs) {
       if (d.valor === null || d.valor === undefined || !isFinite(d.valor)) continue;
@@ -258,7 +375,7 @@ const Grafico = (() => {
       });
       anotacoes.push({
         x: 1, xref: "paper", y: d.valor, yref: "y",
-        text: d.nome, showarrow: false,
+        text: `${Math.round(d.valor)} cm`, showarrow: false,
         xanchor: "left", yanchor: "middle", xshift: 8,
         font: { size: 11, color: d.cor, family: "Segoe UI, system-ui, sans-serif" },
       });
@@ -269,7 +386,7 @@ const Grafico = (() => {
   function layoutBase(doc, r, pontos) {
     const { shapes: shapesPC, anotacoes: anotacoesPC } = shapesPontosControle(pontos || {});
     return {
-      margin: { l: 58, r: shapesPC.length ? 150 : 16, t: 8, b: 34 },
+      margin: { l: 58, r: shapesPC.length ? 70 : 16, t: 8, b: 34 },
       separators: ",.",
       paper_bgcolor: "rgba(0,0,0,0)",
       plot_bgcolor: "rgba(0,0,0,0)",
@@ -325,8 +442,23 @@ const Grafico = (() => {
     L.push(`Dados atualizados em;${formatarDataBR(doc.ultima_data)};fonte do último dado;${doc.fonte_ultimo_dado}`);
     L.push(`Dia D;${formatarDataBR(r.dia_d)};Cota atual (cm);${numeroBR(r.cota_atual, 0)}`);
     L.push(`Intervalo (cota atual ±);${numeroBR(r.range_valor)} ${r.modo === "cm" ? "cm" : "%"};equivalente em cm;±${numeroBR(r.limite_cm)}`);
-    if (r.pc1 !== null && r.pc1 !== undefined) L.push(`Ponto de controle 1 (cm);${numeroBR(r.pc1, 0)}`);
-    if (r.pc2 !== null && r.pc2 !== undefined) L.push(`Ponto de controle 2 (cm);${numeroBR(r.pc2, 0)}`);
+    const datasCSV = datasDoAno(r.ano_atual);
+    for (const [n, pc] of [["1", r.pc1], ["2", r.pc2]]) {
+      if (pc === null || pc === undefined) continue;
+      L.push(`Ponto de controle ${n} (cm);${numeroBR(pc, 0)}`);
+      if (r.trajetorias) {
+        for (const [nome, serie] of [
+          ["maior_queda", r.trajetorias.maior_queda],
+          ["menor_queda", r.trajetorias.menor_queda],
+          ["media", r.trajetorias.media],
+        ]) {
+          const { entrada, saida } = cruzamentosTrajetoria(serie, datasCSV, r.idx_d, pc);
+          L.push([`Toques no ponto de controle ${n} (${nome})`,
+                  "entrada", entrada ? formatarDataBR(entrada.data) : "não atinge",
+                  "saída", saida ? formatarDataBR(saida.data) : "—"].join(";"));
+        }
+      }
+    }
     L.push(`Regras;tolerância ±3 dias no dia D;cobertura pós-D ≥80% e dado nos últimos 10 dias do ano`);
     L.push("");
     L.push("BLOCO 1 — Anos candidatos (universo completo e seleção)");
@@ -347,7 +479,7 @@ const Grafico = (() => {
     L.push("");
     L.push("BLOCO 2 — Séries do gráfico (dia a dia do ano corrente)");
     L.push("data;observado_cm;proj_maior_queda_cm;proj_menor_queda_cm;proj_media_cm;interpolado");
-    const datas = datasDoAno(r.ano_atual);
+    const datas = datasCSV;
     const obs = doc.anos[String(r.ano_atual)];
     const tj = r.trajetorias;
     for (let i = 0; i < 366; i++) {
@@ -410,14 +542,19 @@ const Grafico = (() => {
           Cota do Ponto de controle 1
           <input type="number" step="1" class="ctl-pc1" placeholder="cm">
           <span>cm</span></label>
+        <label class="pc-datas" title="Exibir no gráfico as datas em que cada projeção entra abaixo desta cota e em que volta a subir.">
+          <input type="checkbox" class="ctl-pc1-datas" checked> datas</label>
         <label title="Linha horizontal de referência desenhada no gráfico.">
           Cota do Ponto de controle 2
           <input type="number" step="1" class="ctl-pc2" placeholder="cm">
           <span>cm</span></label>
+        <label class="pc-datas" title="Exibir no gráfico as datas em que cada projeção entra abaixo desta cota e em que volta a subir.">
+          <input type="checkbox" class="ctl-pc2-datas" checked> datas</label>
       </div>
       <p class="aviso"></p>
       <div class="grafico"></div>
-      <p class="estacao-rodape"></p>`;
+      <p class="estacao-rodape"></p>
+      <p class="cruzamentos-pc"></p>`;
     main.appendChild(sec);
 
     const el = {
@@ -430,29 +567,62 @@ const Grafico = (() => {
       aviso: sec.querySelector(".aviso"),
       grafico: sec.querySelector(".grafico"),
       rodape: sec.querySelector(".estacao-rodape"),
+      cruzamentos: sec.querySelector(".cruzamentos-pc"),
       csv: sec.querySelector(".botao-sec"),
       pc1: sec.querySelector(".ctl-pc1"),
       pc2: sec.querySelector(".ctl-pc2"),
+      pc1Datas: sec.querySelector(".ctl-pc1-datas"),
+      pc2Datas: sec.querySelector(".ctl-pc2-datas"),
     };
     // intervalo inicial: o menor (≥50 cm) que contém pelo menos 3 anos análogos
     const rangeAuto = Analogia.rangeInicial(doc);
-    const estado = { range: rangeAuto, modo: "cm", resultado: null, pc1: null, pc2: null };
+    const estado = { range: rangeAuto, modo: "cm", resultado: null,
+                     pc1: null, pc2: null, cruz1: true, cruz2: true };
     if (rangeAuto > 500) el.slider.max = String(Math.ceil(rangeAuto * 2));
     el.slider.value = String(rangeAuto);
     el.num.value = String(rangeAuto);
 
+    /** Texto-resumo de quando cada projeção cruza os pontos de controle definidos. */
+    function textoCruzamentos(r, datas, pontos) {
+      if (!r.trajetorias) return "";
+      const curvas = [
+        ["maior queda", r.trajetorias.maior_queda],
+        ["menor queda", r.trajetorias.menor_queda],
+        ["média", r.trajetorias.media],
+      ];
+      const linhas = [];
+      for (const [n, alvo] of [["1", pontos.pc1], ["2", pontos.pc2]]) {
+        if (alvo === null || alvo === undefined || !isFinite(alvo)) continue;
+        const partes = curvas.map(([nome, serie]) => {
+          const { entrada, saida } = cruzamentosTrajetoria(serie, datas, r.idx_d, alvo);
+          if (!entrada && !saida) return `${nome} não atinge`;
+          const seg = [];
+          if (entrada) seg.push(`entra em ${formatarDataBR(entrada.data).slice(0, 5)}`);
+          if (saida) seg.push(`sai em ${formatarDataBR(saida.data).slice(0, 5)}`);
+          return `${nome} ${seg.join(" e ")}`;
+        });
+        linhas.push(`Ponto de controle ${n} (${numeroBR(alvo, 0)} cm): ${partes.join(" · ")}.`);
+      }
+      return linhas.join(" ");
+    }
+
     function render() {
       const r = Analogia.calcular(doc, estado.range, estado.modo);
       estado.resultado = r;
-      const { traces, anotacoesMinimos } = montarTraces(doc, r);
-      const layout = layoutBase(doc, r, { pc1: estado.pc1, pc2: estado.pc2 });
-      layout.annotations = layout.annotations.concat(anotacoesMinimos);
+      const pontos = { pc1: estado.pc1, pc2: estado.pc2 };
+      // no gráfico, só entram os toques dos PCs com o checkbox "datas" marcado
+      const pontosCruz = { pc1: estado.cruz1 ? estado.pc1 : null,
+                           pc2: estado.cruz2 ? estado.pc2 : null };
+      const { traces, datas, anotacoesRotulos } = montarTraces(doc, r, pontosCruz, el.grafico.clientWidth);
+      const layout = layoutBase(doc, r, pontos);
+      layout.annotations = layout.annotations.concat(anotacoesRotulos);
       Plotly.react(el.grafico, traces, layout, CONFIG);
       el.contagem.textContent = String(r.selecionados.length);
       el.aviso.textContent = r.aviso || "";
       el.rodape.textContent = r.selecionados.length
         ? `Anos análogos (cota em ${formatarDataBR(r.dia_d).slice(0, 5)} dentro de ±${numeroBR(r.limite_cm)} cm da atual): ${r.selecionados.join(", ")}.`
         : "";
+      el.cruzamentos.textContent = textoCruzamentos(r, datas, pontos);
     }
 
     let timer = null;
@@ -509,6 +679,14 @@ const Grafico = (() => {
       estado.pc2 = lerPontoControle(el.pc2);
       agendarRender();
     });
+    el.pc1Datas.addEventListener("change", () => {
+      estado.cruz1 = el.pc1Datas.checked;
+      agendarRender();
+    });
+    el.pc2Datas.addEventListener("change", () => {
+      estado.cruz2 = el.pc2Datas.checked;
+      agendarRender();
+    });
 
     function resultadoComPontosControle() {
       const r = estado.resultado || Analogia.calcular(doc, estado.range, estado.modo);
@@ -533,5 +711,5 @@ const Grafico = (() => {
     render();
   }
 
-  return { montarSecao, datasDoAno, minimoTrajetoria, registro: REGISTRO };
+  return { montarSecao, datasDoAno, minimoTrajetoria, cruzamentosTrajetoria, registro: REGISTRO };
 })();

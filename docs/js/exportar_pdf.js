@@ -194,6 +194,34 @@ const ExportarPDF = (() => {
         columnStyles: { 2: { halign: "right" }, 4: { halign: "right" } },
       });
       y = pdf.lastAutoTable.finalY + 6;
+      if (temPc1 || temPc2) {
+        const dataBR = (iso) => iso.split("-").reverse().join("/");
+        const linhasPC = [];
+        for (const [rotulo, alvo] of [["Ponto de controle 1", temPc1 ? r.pc1 : null],
+                                      ["Ponto de controle 2", temPc2 ? r.pc2 : null]]) {
+          if (alvo === null) continue;
+          for (const [nome, serie] of [["Maior queda", tj.maior_queda],
+                                       ["Menor queda", tj.menor_queda],
+                                       ["Média", tj.media]]) {
+            const { entrada, saida } = Grafico.cruzamentosTrajetoria(serie, datas, r.idx_d, alvo);
+            linhasPC.push([rotulo, fmt(alvo, 0), nome,
+                           entrada ? dataBR(entrada.data) : "não atinge",
+                           saida ? dataBR(saida.data) : "—"]);
+          }
+        }
+        pdf.autoTable({
+          ...GRADE, startY: y,
+          head: [["Ponto de controle", "Cota (cm)", "Curva",
+                  "Toque de entrada", "Toque de saída"]],
+          body: linhasPC,
+          columnStyles: { 1: { halign: "right" } },
+        });
+        y = pdf.lastAutoTable.finalY + 3;
+        y = nota(pdf,
+          "Toque de entrada = data em que a projeção cruza a cota do ponto de controle em " +
+          "queda; toque de saída = data em que volta a cruzá-la em subida. Datas interpoladas " +
+          "linearmente entre os dias vizinhos ao cruzamento.", y, largura) + 1;
+      }
     } else {
       y = nota(pdf, "Sem projeção (nenhum ano análogo no range).", y, largura) + 3;
     }
