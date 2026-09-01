@@ -49,6 +49,10 @@ ESTACOES = [
      "ano_inicio": 2009},
     {"slug": "manaus", "nome": "MANAUS", "rio": "Negro",
      "estcodigo_telemetria": 30659600, "codigo_hidroweb": 14990000},
+    # Telemetria: equipamento RHN 22454440 (15 min); o CotaOnline 22454441 não
+    # tem leituras no data lake.
+    {"slug": "santarem", "nome": "SANTARÉM", "rio": "Tapajós",
+     "estcodigo_telemetria": 22454440, "codigo_hidroweb": 17900000},
 ]
 
 POR_SLUG = {e["slug"]: e for e in ESTACOES}
