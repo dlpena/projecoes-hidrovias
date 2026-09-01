@@ -1,8 +1,9 @@
 # Hidrovias Joaquim
 
 Site estático (GitHub Pages, `docs/` na main) com projeções de cota por analogia para 10 estações
-fluviométricas — ITAITUBA, ABUNÃ, PORTO VELHO, HUMAITÁ, TABATINGA, LADÁRIO, PORTO MURTINHO,
-ITACOATIARA, MANAUS, SANTARÉM —, alimentado por pipeline Python local agendado 2x/dia (10h e 14h).
+fluviométricas — TABATINGA, MANAUS, ITACOATIARA, ABUNÃ, PORTO VELHO, HUMAITÁ, ITAITUBA, SANTARÉM,
+LADÁRIO, PORTO MURTINHO (por rio, de montante para jusante; ordem definida em `estacoes.py`) —,
+alimentado por pipeline Python local agendado 2x/dia (10h e 14h).
 
 ## Regras do projeto
 
