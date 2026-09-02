@@ -10,6 +10,9 @@
   --aviso-borda: #e6c46e;
   --ponto-controle-1: #C0392B;
   --ponto-controle-2: #E0A526;
+  /* séries sintéticas (calculadas de outras estações): painel diferenciado */
+  --sintetica-fundo: #f6f3ff;
+  --sintetica-borda: #cfc4ec;
 }
 
 * { box-sizing: border-box; }
@@ -62,6 +65,7 @@ body {
   background: var(--superficie);
 }
 .nav-estacoes a:hover { color: var(--acento); border-color: var(--acento); }
+.nav-estacoes a.sintetica { border-style: dashed; background: var(--sintetica-fundo); }
 
 main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
 
@@ -73,6 +77,15 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
   padding: 18px 20px 14px;
   scroll-margin-top: 16px;
 }
+.estacao.sintetica { background: var(--sintetica-fundo); border-color: var(--sintetica-borda); }
+.estacao-metodologia {
+  margin: 10px 0 0;
+  padding: 4px 12px;
+  font-size: 0.8rem;
+  color: var(--tinta-2);
+  border-left: 3px solid var(--sintetica-borda);
+}
+.estacao-metodologia code { font: inherit; font-weight: 600; color: var(--tinta); }
 .estacao-cabecalho { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline; }
 .estacao-cabecalho h2 { margin: 0; font-size: 1.12rem; }
 .estacao-codigos { color: var(--tinta-3); font-size: 0.8rem; }

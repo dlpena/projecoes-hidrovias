@@ -102,7 +102,10 @@
         tickformat: ",d",
         nticks: 14,
         gridcolor: "#efefec",
-        zeroline: false,
+        // séries sintéticas: profundidade <= 0 significa passo emerso — o zero é referência
+        zeroline: !!doc.sintetica,
+        zerolinecolor: "#b3261e",
+        zerolinewidth: 1,
       },
       legend: {
         orientation: "h", y: 1.02, yanchor: "bottom", x: 0,
@@ -132,18 +135,26 @@
     const datas = datasDoAno(anoAtual);
     const unidade = doc.unidade || "cm";
 
+    const s = doc.sintetica;
     const sec = document.createElement("section");
-    sec.className = "estacao";
+    sec.className = "estacao" + (s ? " sintetica" : "");
     sec.id = `hist-${doc.slug}`;
+    const codigos = s
+      ? `rio ${doc.rio || "—"} · série calculada de ${s.bases.map((b) => b.nome).join(" e ")} ·`
+      : `rio ${doc.rio || "—"} · HidroWeb ${doc.codigo_hidroweb} ·
+          equip. ${doc.estcodigo_telemetria} ·`;
+    const metodologia = s ? `
+      <p class="estacao-metodologia"><strong>Série sintética</strong> — ${s.descricao}
+        <code>${s.formula_texto}</code> · Fonte do método: ${s.fonte_metodo}.
+        Publicada em cm inteiros; cada dia só existe quando ambas as bases têm dado. ${s.nota_sinal}</p>` : "";
     sec.innerHTML = `
       <div class="estacao-cabecalho">
         <h2>${doc.nome}</h2>
-        <span class="estacao-codigos">rio ${doc.rio || "—"} · HidroWeb ${doc.codigo_hidroweb} ·
-          equip. ${doc.estcodigo_telemetria} ·
+        <span class="estacao-codigos">${codigos}
           <a href="index.html#${doc.slug}" class="link-secundario">ver projeção →</a></span>
         <span class="estacao-ultimo">Último dado: <strong>${formatarDataBR(doc.ultima_data)}</strong>
-          · ${doc.ultimo_valor} ${unidade} (${doc.fonte_ultimo_dado})</span>
-      </div>
+          · ${doc.ultimo_valor} ${unidade} (${s ? "calculada · bases em " : ""}${doc.fonte_ultimo_dado})</span>
+      </div>${metodologia}
       <div class="grafico"></div>`;
     main.appendChild(sec);
 
@@ -180,6 +191,7 @@
       const a = document.createElement("a");
       a.href = `#hist-${e.slug}`;
       a.textContent = e.nome;
+      if (e.tipo === "sintetica") a.className = "sintetica";
       nav.appendChild(a);
     }
     for (const e of indice.estacoes) {

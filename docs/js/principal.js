@@ -25,6 +25,7 @@
       const a = document.createElement("a");
       a.href = `#${e.slug}`;
       a.textContent = e.nome;
+      if (e.tipo === "sintetica") a.className = "sintetica";
       nav.appendChild(a);
     }
 

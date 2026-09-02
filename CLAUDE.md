@@ -2,8 +2,9 @@
 
 Site estático (GitHub Pages, `docs/` na main) com projeções de cota por analogia para 10 estações
 fluviométricas — TABATINGA, MANAUS, ITACOATIARA, ABUNÃ, PORTO VELHO, HUMAITÁ, ITAITUBA, SANTARÉM,
-LADÁRIO, PORTO MURTINHO (por rio, de montante para jusante; ordem definida em `estacoes.py`) —,
-alimentado por pipeline Python local agendado 2x/dia (10h e 14h).
+LADÁRIO, PORTO MURTINHO (por rio, de montante para jusante; ordem definida em `estacoes.py`) — e
+3 séries sintéticas de passos críticos do Tapajós entre Itaituba e Santarém (LAGO DO ROQUE, MONTE
+CRISTO, ITAPAIUNAS), alimentado por pipeline Python local agendado 2x/dia (10h e 14h).
 
 ## Regras do projeto
 
@@ -36,6 +37,15 @@ irmãos) ficam em `CLAUDE.local.md`, não versionado.
   (três referências de nível distintas na história), ABUNÃ 2014 (remanso da UHE Jirau elevou as
   mínimas ~3 m desde o enchimento) e HUMAITÁ 1968 (série 1931-1948 em referência ~7-9 m abaixo da
   atual, separada por lacuna de 18 anos). O racional de cada corte está comentado no próprio arquivo.
+- **Séries sintéticas** (`tipo: "sintetica"` em `estacoes.py`; `pipeline/sinteticas.py`): profundidade
+  disponível em passos críticos sem régua, calculada dia a dia por combinação linear das cotas de
+  outras estações (equações do ábaco réguas–calado da Marinha, em m; publicada em cm inteiros,
+  `grandeza` "Profundidade", negativos preservados = passo emerso). Calculadas **a partir dos JSONs
+  publicados das bases** (`docs/dados/`), nunca do data lake/cache — rodam sempre após o loop de
+  fetch em `atualizar.py`, em toda rodada (`--estacao <sintética>` refaz só ela, sem token). O
+  bloco `sintetica` do JSON (fórmula, bases, fonte do método) alimenta painel (fundo lilás,
+  `.estacao.sintetica`), CSV, memória de cálculo e PDF do conjunto; todo o tratamento no front-end
+  é condicionado a `doc.sintetica`/`doc.grandeza`, para o espelho Belo Monte seguir válido.
 - **Sentinela de referência de nível** (`pipeline/verificacoes.py`, ver docstring do módulo para a
   motivação e a fórmula do limiar). Se o alerta disparar, investigar fonte a fonte (consistido vs
   bruto vs telemetria em sobreposição) antes de decidir `ano_inicio`; degrau real de clima/regime

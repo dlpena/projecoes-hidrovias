@@ -21,7 +21,7 @@ from datetime import datetime
 from pathlib import Path
 
 from pipeline import DIR_CACHE, DIR_DADOS_SITE, DIR_LOGS
-from estacoes import ESTACOES, POR_SLUG
+from estacoes import ESTACOES, ESTACOES_REAIS, ESTACOES_SINTETICAS, POR_SLUG
 
 LOCK = DIR_CACHE / ".lock"
 LOCK_VALIDADE_S = 2 * 3600
@@ -91,26 +91,37 @@ def main() -> int:
     args = p.parse_args()
 
     configurar_log()
-    alvos = [POR_SLUG[args.estacao]] if args.estacao else ESTACOES
     if args.estacao and args.estacao not in POR_SLUG:
         log.error("Estação desconhecida: %s (válidas: %s)", args.estacao, ", ".join(POR_SLUG))
         return 1
+    # Sintéticas nunca vão ao data lake: são recalculadas dos JSONs publicados
+    # das bases depois do loop, em toda rodada. `--estacao <sintética>` só refaz
+    # essa sintética, sem precisar de conexão/token.
+    alvo = POR_SLUG[args.estacao] if args.estacao else None
+    if alvo is None:
+        alvos, sinteticas_alvo = ESTACOES_REAIS, ESTACOES_SINTETICAS
+    elif alvo.get("tipo") == "sintetica":
+        alvos, sinteticas_alvo = [], [alvo]
+    else:
+        alvos, sinteticas_alvo = [alvo], ESTACOES_SINTETICAS
 
     if not adquirir_lock():
         return 1
     try:
-        from ana_datalake import connect
-        try:
-            conn = connect("hidro", interactive=False)
-        except Exception as exc:  # token expirado / sem cache MSAL
-            log.error(
-                "Falha de autenticação no Synapse: %s\n"
-                "Renove o token com: python -c \"from ana_datalake import connect; connect('hidro')\"",
-                exc,
-            )
-            return 2
+        conn = None
+        if alvos:
+            from ana_datalake import connect
+            try:
+                conn = connect("hidro", interactive=False)
+            except Exception as exc:  # token expirado / sem cache MSAL
+                log.error(
+                    "Falha de autenticação no Synapse: %s\n"
+                    "Renove o token com: python -c \"from ana_datalake import connect; connect('hidro')\"",
+                    exc,
+                )
+                return 2
 
-        from pipeline import fetch, integrar, exportar_json
+        from pipeline import fetch, integrar, exportar_json, sinteticas
 
         resumos, falhas = [], []
         for est in alvos:
@@ -124,6 +135,10 @@ def main() -> int:
             except Exception:
                 log.exception("%s: falha — mantendo JSON anterior", est["slug"])
                 falhas.append(est["slug"])
+
+        resumos_sint, falhas_sint = sinteticas.exportar_sinteticas(sinteticas_alvo)
+        resumos.extend(resumos_sint)
+        falhas.extend(falhas_sint)
 
         if resumos:
             exportar_json.exportar_indice(mesclar_indice(resumos))

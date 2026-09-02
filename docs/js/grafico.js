@@ -13,6 +13,8 @@ const Grafico = (() => {
     diaD: "#888",
     pontoControle1: "#C0392B",
     pontoControle2: "#E0A526",
+    chip: "rgba(255,255,255,0.92)",          // fundo dos rótulos sobre o painel branco
+    chipSintetica: "rgba(246,243,255,0.92)", // idem sobre o painel lilás das séries sintéticas
   };
   const MESES = ["jan", "fev", "mar", "abr", "mai", "jun",
                  "jul", "ago", "set", "out", "nov", "dez"];
@@ -121,15 +123,15 @@ const Grafico = (() => {
 
   /**
    * Annotation de rótulo posicionada em pixels a partir do deslocamento calculado por
-   * posicionarRotulos. `chip` desenha um fundo branco semi-opaco atrás do texto — essencial
-   * quando o rótulo pode cair sobre o feixe de curvas cinzas dos anos análogos.
+   * posicionarRotulos. `chip` (cor de fundo) desenha um fundo semi-opaco atrás do texto —
+   * essencial quando o rótulo pode cair sobre o feixe de curvas cinzas dos anos análogos.
    */
-  function rotuloPonto(x, y, texto, cor, deslocamento, chip = false) {
+  function rotuloPonto(x, y, texto, cor, deslocamento, chip = null) {
     return {
       x, y, xref: "x", yref: "y", text: texto,
       xanchor: "center", yanchor: "middle",
       font: { size: 11, color: cor, family: "Segoe UI, system-ui, sans-serif" },
-      ...(chip ? { bgcolor: "rgba(255,255,255,0.92)", borderpad: 1 } : {}),
+      ...(chip ? { bgcolor: chip, borderpad: 1 } : {}),
       ...(deslocamento.comSeta
         ? { showarrow: true, ax: deslocamento.ax, ay: deslocamento.ay, axref: "pixel", ayref: "pixel",
             arrowhead: 0, arrowwidth: 1, arrowcolor: cor, standoff: 3 }
@@ -234,7 +236,7 @@ const Grafico = (() => {
    * menor queda ACIMA (curva mais alta), média no primeiro lado livre. As curvas de lado fixo
    * são posicionadas antes para a média se encaixar por último.
    */
-  function tracesCruzamentosControle(r, datas, pontos, amplitudeY, larguraGrafico) {
+  function tracesCruzamentosControle(r, datas, pontos, amplitudeY, larguraGrafico, chipCor = CORES.chip) {
     const traces = [];
     const anotacoes = [];
     const tj = r.trajetorias;
@@ -289,7 +291,7 @@ const Grafico = (() => {
                                    p.sentido === "entrada" ? "triangle-down" : "triangle-up"));
       anotacoes.push(rotuloPonto(
         p.x, p.y, formatarDataBR(p.x).slice(0, 5), p.cor,
-        { comSeta: true, ax: 0, ay: pos[i].dir * (20 + pos[i].nivel * 19) }, true));
+        { comSeta: true, ax: 0, ay: pos[i].dir * (20 + pos[i].nivel * 19) }, chipCor));
     });
     return { traces, anotacoes };
   }
@@ -351,7 +353,8 @@ const Grafico = (() => {
       });
 
       const { traces: tracesCruz, anotacoes: anotacoesCruz } =
-        tracesCruzamentosControle(r, datas, pontos || {}, amplitudeY, larguraGrafico);
+        tracesCruzamentosControle(r, datas, pontos || {}, amplitudeY, larguraGrafico,
+                                  doc.sintetica ? CORES.chipSintetica : CORES.chip);
       traces.push(...tracesCruz);
       anotacoesRotulos.push(...anotacoesCruz);
     }
@@ -402,11 +405,14 @@ const Grafico = (() => {
       },
       yaxis: {
         fixedrange: true,
-        title: { text: "Cota (cm)", font: { size: 12 } },
+        title: { text: `${doc.grandeza || "Cota"} (${doc.unidade || "cm"})`, font: { size: 12 } },
         tickformat: ",d",   // valor inteiro com separador de milhar (sem "k")
         nticks: 14,         // passo menor entre os ticks
         gridcolor: "#efefec",
-        zeroline: false,
+        // séries sintéticas: profundidade <= 0 significa passo emerso — o zero é referência
+        zeroline: !!doc.sintetica,
+        zerolinecolor: "#b3261e",
+        zerolinewidth: 1,
       },
       legend: {
         orientation: "h", y: 1.02, yanchor: "bottom", x: 0,
@@ -436,12 +442,16 @@ const Grafico = (() => {
 
   function gerarCSV(doc, r) {
     const L = [];
-    const cab = `${doc.nome} (${doc.rio || ""}) · HidroWeb ${doc.codigo_hidroweb} · telemetria ${doc.estcodigo_telemetria}`;
+    const g = doc.grandeza || "Cota", gMin = g.toLowerCase(), s = doc.sintetica;
+    const cab = s
+      ? `${doc.nome} (${doc.rio || ""}) · série sintética calculada de ` +
+        s.bases.map((b) => `${b.nome} (HidroWeb ${b.codigo_hidroweb})`).join(" e ")
+      : `${doc.nome} (${doc.rio || ""}) · HidroWeb ${doc.codigo_hidroweb} · telemetria ${doc.estcodigo_telemetria}`;
     L.push(`Memória de cálculo — projeção por analogia;${cab}`);
     L.push(`Gerado em;${new Date().toLocaleString("pt-BR")}`);
     L.push(`Dados atualizados em;${formatarDataBR(doc.ultima_data)};fonte do último dado;${doc.fonte_ultimo_dado}`);
-    L.push(`Dia D;${formatarDataBR(r.dia_d)};Cota atual (cm);${numeroBR(r.cota_atual, 0)}`);
-    L.push(`Intervalo (cota atual ±);${numeroBR(r.range_valor)} ${r.modo === "cm" ? "cm" : "%"};equivalente em cm;±${numeroBR(r.limite_cm)}`);
+    L.push(`Dia D;${formatarDataBR(r.dia_d)};${g} atual (cm);${numeroBR(r.cota_atual, 0)}`);
+    L.push(`Intervalo (${gMin} atual ±);${numeroBR(r.range_valor)} ${r.modo === "cm" ? "cm" : "%"};equivalente em cm;±${numeroBR(r.limite_cm)}`);
     const datasCSV = datasDoAno(r.ano_atual);
     for (const [n, pc] of [["1", r.pc1], ["2", r.pc2]]) {
       if (pc === null || pc === undefined) continue;
@@ -460,9 +470,15 @@ const Grafico = (() => {
       }
     }
     L.push(`Regras;tolerância ±3 dias no dia D;cobertura pós-D ≥80% e dado nos últimos 10 dias do ano`);
+    if (s) {
+      L.push(`Metodologia (série sintética);${s.formula_texto};publicada em cm inteiros (profundidade × 100)`);
+      L.push(`Fonte do método;${s.fonte_metodo}`);
+      L.push(`Bases;${s.bases.map((b) => `${b.nome} (HidroWeb ${b.codigo_hidroweb}, coeficiente ${numeroBR(b.coeficiente, 3)})`).join(";")};constante;${numeroBR(s.constante_m, 2)} m`);
+      L.push(`Interpretação;${s.nota_sinal};cada dia só existe quando todas as bases têm dado`);
+    }
     L.push("");
     L.push("BLOCO 1 — Anos candidatos (universo completo e seleção)");
-    L.push("ano;fonte_dos_dados;cota_em_D_cm;dias_tolerancia;cobertura_pos_D_%;min_pos_D_cm;delta_queda_cm;selecionado;motivo_exclusao");
+    L.push(`ano;fonte_dos_dados;${gMin}_em_D_cm;dias_tolerancia;cobertura_pos_D_%;min_pos_D_cm;delta_queda_cm;selecionado;motivo_exclusao`);
     for (const c of r.candidatos) {
       L.push([
         c.ano,
@@ -510,19 +526,29 @@ const Grafico = (() => {
 
   /** Cria a seção completa da estação dentro de `main`. */
   function montarSecao(main, doc) {
+    // grandeza por painel (Cota nas estações; Profundidade nas séries sintéticas) — sempre
+    // derivada do doc, nunca de estado de módulo: há vários painéis no mesmo módulo
+    const g = doc.grandeza || "Cota", gMin = g.toLowerCase(), s = doc.sintetica;
     const sec = document.createElement("section");
-    sec.className = "estacao";
+    sec.className = "estacao" + (s ? " sintetica" : "");
     sec.id = doc.slug;
+    const codigos = s
+      ? `rio ${doc.rio || "—"} · série calculada de ${s.bases.map((b) => b.nome).join(" e ")}`
+      : `rio ${doc.rio || "—"} · HidroWeb ${doc.codigo_hidroweb} · equip. ${doc.estcodigo_telemetria}`;
+    const metodologia = s ? `
+      <p class="estacao-metodologia"><strong>Série sintética</strong> — ${s.descricao}
+        <code>${s.formula_texto}</code> · Fonte do método: ${s.fonte_metodo}.
+        Publicada em cm inteiros; cada dia só existe quando ambas as bases têm dado. ${s.nota_sinal}</p>` : "";
     sec.innerHTML = `
       <div class="estacao-cabecalho">
         <h2>${doc.nome}</h2>
-        <span class="estacao-codigos">rio ${doc.rio || "—"} · HidroWeb ${doc.codigo_hidroweb} · equip. ${doc.estcodigo_telemetria}</span>
+        <span class="estacao-codigos">${codigos}</span>
         <span class="estacao-ultimo">Último dado: <strong>${formatarDataBR(doc.ultima_data)}</strong>
-          · ${doc.ultimo_valor} cm (${doc.fonte_ultimo_dado})</span>
-      </div>
+          · ${doc.ultimo_valor} cm (${s ? "calculada · bases em " : ""}${doc.fonte_ultimo_dado})</span>
+      </div>${metodologia}
       <div class="controles">
-        <label title="Entram como análogos os anos em que a cota, neste mesmo dia do calendário, estava até este valor acima ou abaixo da cota atual.">
-          Intervalo (cota atual ±)
+        <label title="Entram como análogos os anos em que a ${gMin}, neste mesmo dia do calendário, estava até este valor acima ou abaixo da ${gMin} atual.">
+          Intervalo (${gMin} atual ±)
           <input type="range" min="1" max="500" step="1" value="10" class="ctl-slider">
           <input type="number" min="0.5" max="500" step="0.5" value="10" class="ctl-num">
           <span class="ctl-unidade">cm</span></label>
@@ -538,17 +564,17 @@ const Grafico = (() => {
         </span>
       </div>
       <div class="controles-referencia">
-        <label title="Linha horizontal de referência desenhada no gráfico (ex.: cota mínima navegável).">
-          Cota do Ponto de controle 1
+        <label title="Linha horizontal de referência desenhada no gráfico (ex.: ${gMin} mínima navegável).">
+          ${g} do Ponto de controle 1
           <input type="number" step="1" class="ctl-pc1" placeholder="cm">
           <span>cm</span></label>
-        <label class="pc-datas" title="Exibir no gráfico as datas em que cada projeção entra abaixo desta cota e em que volta a subir.">
+        <label class="pc-datas" title="Exibir no gráfico as datas em que cada projeção entra abaixo desta ${gMin} e em que volta a subir.">
           <input type="checkbox" class="ctl-pc1-datas" checked> datas</label>
         <label title="Linha horizontal de referência desenhada no gráfico.">
-          Cota do Ponto de controle 2
+          ${g} do Ponto de controle 2
           <input type="number" step="1" class="ctl-pc2" placeholder="cm">
           <span>cm</span></label>
-        <label class="pc-datas" title="Exibir no gráfico as datas em que cada projeção entra abaixo desta cota e em que volta a subir.">
+        <label class="pc-datas" title="Exibir no gráfico as datas em que cada projeção entra abaixo desta ${gMin} e em que volta a subir.">
           <input type="checkbox" class="ctl-pc2-datas" checked> datas</label>
       </div>
       <p class="aviso"></p>
@@ -620,7 +646,7 @@ const Grafico = (() => {
       el.contagem.textContent = String(r.selecionados.length);
       el.aviso.textContent = r.aviso || "";
       el.rodape.textContent = r.selecionados.length
-        ? `Anos análogos (cota em ${formatarDataBR(r.dia_d).slice(0, 5)} dentro de ±${numeroBR(r.limite_cm)} cm da atual): ${r.selecionados.join(", ")}.`
+        ? `Anos análogos (${gMin} em ${formatarDataBR(r.dia_d).slice(0, 5)} dentro de ±${numeroBR(r.limite_cm)} cm da atual): ${r.selecionados.join(", ")}.`
         : "";
       el.cruzamentos.textContent = textoCruzamentos(r, datas, pontos);
     }

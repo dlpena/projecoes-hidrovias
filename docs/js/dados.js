@@ -25,6 +25,7 @@ const Dados = (() => {
       ultima_data: atual.ultima_data,
       ultimo_valor: atual.ultimo_valor,
       fonte_ultimo_dado: atual.fonte_ultimo_dado,
+      sintetica: atual.sintetica || null,
       fonte_por_ano: { ...historico.fonte_por_ano, ...atual.fonte_por_ano },
       cobertura_fontes: mesclarCobertura(historico.cobertura_fontes, atual.cobertura_fontes),
       anos: { ...historico.anos, ...atual.anos },

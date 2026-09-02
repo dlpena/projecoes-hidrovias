@@ -2,12 +2,31 @@
 
 - estcodigo_telemetria: código do equipamento (ESTCODIGO / HORESTACAO em hidroInfoAna).
 - codigo_hidroweb: código de 8 dígitos do HidroWeb (EstacaoCodigo nos pivots / ESTCODIGOADICIONAL).
+- tipo "sintetica": série calculada por combinação linear de outras estações
+  (`bases`, `coeficientes`, `constante_m`), sem códigos HidroWeb/telemetria —
+  não passa pelo fetch; ver pipeline/sinteticas.py.
 
 Ordem da lista = ordem dos painéis no site (via indice.json): agrupada por rio,
 de montante para jusante, seguindo o eixo Solimões/Amazonas com cada afluente
 encaixado no ponto em que desemboca (Negro em Manaus, Madeira em Itacoatiara,
 Tapajós em Santarém); a bacia do Paraguai, separada, fecha a lista.
 """
+
+FONTE_MARINHA = "Marinha do Brasil — ábaco réguas–calado (rio Tapajós)"
+DESCRICAO_PASSO = "Passo crítico de navegação do rio Tapajós, sem régua própria."
+
+
+def _sintetica(slug, nome, coef_itaituba, coef_santarem, constante_m):
+    # Profundidade disponível no passo (m) = a·ITAITUBA + b·SANTARÉM + c, com as
+    # cotas em m (equações de interpolação do ábaco réguas–calado da Marinha).
+    # Publicada em cm inteiros como as demais séries; valores <= 0 significam
+    # passo acima do nível d'água. Só existe nos dias em que as duas bases têm dado.
+    return {"slug": slug, "nome": nome, "rio": "Tapajós", "tipo": "sintetica",
+            "variavel": "profundidade", "grandeza": "Profundidade", "unidade": "cm",
+            "bases": ["itaituba", "santarem"],
+            "coeficientes": [coef_itaituba, coef_santarem], "constante_m": constante_m,
+            "fonte_metodo": FONTE_MARINHA, "descricao": DESCRICAO_PASSO}
+
 
 ESTACOES = [
     # --- Solimões / Amazonas ---
@@ -53,6 +72,11 @@ ESTACOES = [
     # --- Tapajós ---
     {"slug": "itaituba", "nome": "ITAITUBA", "rio": "Tapajós",
      "estcodigo_telemetria": 41655580, "codigo_hidroweb": 17730000},
+    # Passos críticos entre Itaituba e Santarém, de montante para jusante (quanto
+    # maior o peso de Itaituba, mais a montante).
+    _sintetica("lago-do-roque", "LAGO DO ROQUE", 0.955, 0.045, -2.15),
+    _sintetica("monte-cristo", "MONTE CRISTO", 0.825, 0.175, -1.99),
+    _sintetica("itapaiunas", "ITAPAIUNAS", 0.300, 0.700, -1.36),
     # Telemetria: equipamento RHN 22454440 (15 min); o CotaOnline 22454441 não
     # tem leituras no data lake.
     {"slug": "santarem", "nome": "SANTARÉM", "rio": "Tapajós",
@@ -65,3 +89,5 @@ ESTACOES = [
 ]
 
 POR_SLUG = {e["slug"]: e for e in ESTACOES}
+ESTACOES_REAIS = [e for e in ESTACOES if e.get("tipo") != "sintetica"]
+ESTACOES_SINTETICAS = [e for e in ESTACOES if e.get("tipo") == "sintetica"]

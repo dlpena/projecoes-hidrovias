@@ -11,7 +11,7 @@
   <header class="topo">
     <div>
       <h1>Projeções de Nível — Estações-Chave para Hidrovias</h1>
-      <p class="subtitulo">Projeção por analogia · série integrada (HIDRO consistido &gt; bruto &gt; telemetria) · cotas em cm</p>
+      <p class="subtitulo">Projeção por analogia · série integrada (HIDRO consistido &gt; bruto &gt; telemetria) · cotas e profundidades em cm</p>
     </div>
     <div class="topo-acoes">
       <nav id="nav-estacoes" class="nav-estacoes"></nav>
@@ -79,6 +79,23 @@
         telemetria (a memória de cálculo mostra a cobertura de cada fonte).</li>
       </ul>
 
+      <h3>Séries sintéticas — passos críticos do Tapajós</h3>
+      <p>Os painéis de <strong>fundo lilás</strong> (Lago do Roque, Monte Cristo e Itapaiunas) não
+      são estações: são passos críticos de navegação entre Itaituba e Santarém, sem régua própria.
+      A série mostrada é a <strong>profundidade disponível no passo</strong>, calculada dia a dia
+      pelas equações de interpolação do ábaco réguas–calado da Marinha do Brasil, com as cotas de
+      Itaituba e Santarém em metros:</p>
+      <ul>
+        <li>Lago do Roque = 0,955 × Itaituba + 0,045 × Santarém − 2,15</li>
+        <li>Monte Cristo = 0,825 × Itaituba + 0,175 × Santarém − 1,99</li>
+        <li>Itapaiunas = 0,300 × Itaituba + 0,700 × Santarém − 1,36</li>
+      </ul>
+      <p>O resultado é publicado em cm inteiros (profundidade × 100) e só existe nos dias em que
+      as duas bases têm dado. <strong>Valores ≤ 0 indicam passo acima do nível d'água</strong> (a
+      linha vermelha do zero marca essa referência). A projeção por analogia funciona exatamente
+      como nas estações, sobre a série de profundidade; o intervalo em % é relativo à
+      profundidade atual. A fórmula e a fonte constam no painel, no CSV e na memória de cálculo.</p>
+
       <h3>Como ler (e como não ler)</h3>
       <p>Isto <strong>não é uma previsão meteorológica</strong>: é uma projeção por analogia —
       "se este ano se comportar como os anos parecidos, a cota deve ficar entre a curva laranja
@@ -103,6 +120,9 @@
     com a cota atual no dia D; as curvas cinzas são as trajetórias deslocadas de todos os anos
     análogos. O intervalo inicial de cada gráfico é o menor (≥50 cm) que contém pelo menos
     3 anos análogos. Detalhes no botão "Como funciona?".
+    Os painéis de fundo lilás são séries sintéticas (profundidade disponível em passos críticos
+    do Tapajós, sem régua), calculadas das cotas de Itaituba e Santarém pelas equações do ábaco
+    réguas–calado da Marinha do Brasil — a fórmula consta em cada painel.
     Fonte: data lake da ANA (banco HIDRO e telemetria).</p>
   </footer>
 

@@ -106,11 +106,13 @@ def _filtrar_cobertura(cobertura: dict, incluir_ano) -> dict:
 
 def exportar_estacao(estacao: dict, integrada: pd.DataFrame,
                      df_hidro: pd.DataFrame | None = None,
-                     df_tele: pd.DataFrame | None = None) -> dict:
+                     df_tele: pd.DataFrame | None = None,
+                     meta_extra: dict | None = None) -> dict:
     """Grava docs/dados/{slug}_historico.json e {slug}_atual.json.
 
     Retorna o resumo para o indice.json. Se a estação define `ano_inicio`
     (ex.: mudança de referência de nível), anos anteriores ficam fora do site.
+    `meta_extra` entra nos dois arquivos (ex.: bloco `sintetica`).
     """
     ano_inicio = estacao.get("ano_inicio")
     if ano_inicio:
@@ -137,11 +139,12 @@ def exportar_estacao(estacao: dict, integrada: pd.DataFrame,
         "slug": estacao["slug"],
         "nome": estacao["nome"],
         "rio": estacao.get("rio"),
-        "codigo_hidroweb": estacao["codigo_hidroweb"],
-        "estcodigo_telemetria": estacao["estcodigo_telemetria"],
+        "codigo_hidroweb": estacao.get("codigo_hidroweb"),
+        "estcodigo_telemetria": estacao.get("estcodigo_telemetria"),
         "variavel": estacao.get("variavel", "cota"),
         "grandeza": estacao.get("grandeza", "Cota"),
         "unidade": estacao.get("unidade", "cm"),
+        **(meta_extra or {}),
     }
 
     historico = {
@@ -168,7 +171,7 @@ def exportar_estacao(estacao: dict, integrada: pd.DataFrame,
     _gravar_se_mudou(DIR_DADOS_SITE / f"{estacao['slug']}_historico.json", historico)
     _gravar_atomico(DIR_DADOS_SITE / f"{estacao['slug']}_atual.json", atual)
 
-    return {
+    resumo = {
         "slug": estacao["slug"],
         "nome": estacao["nome"],
         "rio": estacao.get("rio"),
@@ -176,6 +179,9 @@ def exportar_estacao(estacao: dict, integrada: pd.DataFrame,
         "ultimo_valor": atual["ultimo_valor"],
         "fonte_ultimo_dado": atual["fonte_ultimo_dado"],
     }
+    if estacao.get("tipo"):
+        resumo["tipo"] = estacao["tipo"]
+    return resumo
 
 
 def exportar_indice(resumos: list[dict]) -> None:

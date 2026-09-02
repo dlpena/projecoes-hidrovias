@@ -1,6 +1,6 @@
 # Hidrovias Joaquim — Projeções de cota por analogia
 
-Site estático com projeções de nível d'água para 9 estações fluviométricas
+Site estático com projeções de nível d'água para 10 estações fluviométricas (e 3 séries sintéticas de passos críticos do Tapajós, calculadas de Itaituba e Santarém)
 (Itaituba, Abunã, Porto Velho, Humaitá, Tabatinga, Ladário, Porto Murtinho,
 Itacoatiara e Manaus), alimentado pelo data lake da ANA via pipeline local.
 

@@ -94,22 +94,28 @@ const ExportarPDF = (() => {
     const pdf = new window.jspdf.jsPDF({ unit: "mm", format: "a4" });
     const largura = 210 - 2 * MARGEM;
     let y = MARGEM + 3;
+    const g = docE.grandeza || "Cota", gMin = g.toLowerCase(), s = docE.sintetica || null;
+    let nSec = 0;
+    const sec = (titulo) => `${++nSec}. ${titulo}`;
 
     pdf.setFont("helvetica", "bold").setFontSize(15).setTextColor(26);
     pdf.text("Memória de cálculo — projeção por analogia", MARGEM, y);
     y += 6;
     pdf.setFont("helvetica", "normal").setFontSize(9).setTextColor(60);
-    pdf.text(t(`${docE.nome} · rio ${docE.rio || "—"} · HidroWeb ${docE.codigo_hidroweb} · ` +
-               `equip. ${docE.estcodigo_telemetria} · gerado em ${new Date().toLocaleString("pt-BR")}`),
+    const identificacao = s
+      ? `série sintética calculada de ${s.bases.map((b) => b.nome).join(" e ")}`
+      : `HidroWeb ${docE.codigo_hidroweb} · equip. ${docE.estcodigo_telemetria}`;
+    pdf.text(t(`${docE.nome} · rio ${docE.rio || "—"} · ${identificacao} · ` +
+               `gerado em ${new Date().toLocaleString("pt-BR")}`),
              MARGEM, y);
     y += 8;
 
-    y = tituloSecao(pdf, "1. Parâmetros", y);
+    y = tituloSecao(pdf, sec("Parâmetros"), y);
     const dataD = r.dia_d.split("-").reverse().join("/");
     const linhasParametros = [
       ["Dia D (último dado)", `${dataD} (${docE.fonte_ultimo_dado})`,
-       "Cota atual", `${fmt(r.cota_atual, 0)} cm`],
-      ["Intervalo (cota atual ±)", t(`${rotuloRange(r)} — o ajustado na tela (equivale a ±${fmt(r.limite_cm)} cm)`),
+       `${g} atual`, `${fmt(r.cota_atual, 0)} cm`],
+      [`Intervalo (${gMin} atual ±)`, t(`${rotuloRange(r)} — o ajustado na tela (equivale a ±${fmt(r.limite_cm)} cm)`),
        "Anos análogos", String(r.selecionados.length)],
     ];
     const temPc1 = r.pc1 !== null && r.pc1 !== undefined;
@@ -127,23 +133,46 @@ const ExportarPDF = (() => {
     });
     y = pdf.lastAutoTable.finalY + 3;
     y = nota(pdf,
-      "Regras: cota do candidato no dia D com tolerância de ±3 dias (mais próximo primeiro; " +
-      "empate favorece o dia anterior); seleção se |cota − cota atual| ≤ range; exige-se ≥80% " +
-      "de cobertura entre D e 31/dez e dado nos últimos 10 dias do ano; delta de queda = cota " +
-      "em D − mínimo pós-D; trajetórias deslocadas para coincidir com a cota atual em D; " +
-      "lacunas internas interpoladas linearmente (marcadas na seção 5). Este documento reflete " +
-      "o intervalo ajustado na tela no momento da exportação.", y, largura);
+      `Regras: ${gMin} do candidato no dia D com tolerância de ±3 dias (mais próximo primeiro; ` +
+      `empate favorece o dia anterior); seleção se |${gMin} − ${gMin} atual| ≤ intervalo; exige-se ≥80% ` +
+      `de cobertura entre D e 31/dez e dado nos últimos 10 dias do ano; delta de queda = ${gMin} ` +
+      `em D − mínimo pós-D; trajetórias deslocadas para coincidir com a ${gMin} atual em D; ` +
+      "lacunas internas interpoladas linearmente (marcadas na seção de série dia a dia). Este " +
+      "documento reflete o intervalo ajustado na tela no momento da exportação.", y, largura);
     if (r.aviso) y = nota(pdf, `Aviso: ${r.aviso}`, y, largura);
 
-    y = tituloSecao(pdf, "2. Cobertura por fonte da série integrada", y + 1);
-    y = desenharHeatmap(pdf, docE, y, largura);
-    y = nota(pdf,
-      "Cor = % de dias do ano com dado na fonte (verde 100% · amarelo 50% · vermelho 0%; " +
-      "branco = sem dado). A série integrada usa, dia a dia, a fonte de maior prioridade " +
-      "disponível (consistido > bruto > telemetria). A telemetria é consultada apenas na " +
-      "janela recente ainda não coberta pelo histórico congelado do HIDRO.", y, largura);
+    if (s) {
+      y = tituloSecao(pdf, sec("Metodologia da série sintética"), y + 1);
+      pdf.autoTable({
+        ...GRADE, startY: y,
+        body: [
+          ["Fórmula", t(s.formula_texto)],
+          ["Bases", t(s.bases.map((b) =>
+            `${b.nome} (HidroWeb ${b.codigo_hidroweb}) · coeficiente ${fmt(b.coeficiente, 3)}`).join("; "))],
+          ["Constante", t(`${fmt(s.constante_m, 2)} m (${s.constante_cm} cm)`)],
+          ["Fonte do método", t(s.fonte_metodo)],
+          ["Interpretação", t(s.nota_sinal)],
+        ],
+        columnStyles: { 0: { fontStyle: "bold", cellWidth: 34 } },
+      });
+      y = pdf.lastAutoTable.finalY + 3;
+      y = nota(pdf,
+        `${s.descricao} A série é calculada dia a dia a partir das cotas publicadas das bases ` +
+        "(série integrada de cada uma: consistido > bruto > telemetria), com as cotas em m e o " +
+        "resultado publicado em cm inteiros (profundidade × 100, arredondada). Cada dia só existe " +
+        "quando todas as bases têm dado; a coluna Fonte da seção seguinte reúne as fontes das bases " +
+        "naquele ano. A cobertura por fonte de cada base está na memória de cálculo dela.", y, largura);
+    } else {
+      y = tituloSecao(pdf, sec("Cobertura por fonte da série integrada"), y + 1);
+      y = desenharHeatmap(pdf, docE, y, largura);
+      y = nota(pdf,
+        "Cor = % de dias do ano com dado na fonte (verde 100% · amarelo 50% · vermelho 0%; " +
+        "branco = sem dado). A série integrada usa, dia a dia, a fonte de maior prioridade " +
+        "disponível (consistido > bruto > telemetria). A telemetria é consultada apenas na " +
+        "janela recente ainda não coberta pelo histórico congelado do HIDRO.", y, largura);
+    }
 
-    y = tituloSecao(pdf, "3. Universo de anos candidatos", y + 1);
+    y = tituloSecao(pdf, sec("Universo de anos candidatos"), y + 1);
     const fpa = docE.fonte_por_ano || {};
     const selecionadas = new Set();
     const corpo = r.candidatos.map((c, i) => {
@@ -158,7 +187,7 @@ const ExportarPDF = (() => {
     });
     pdf.autoTable({
       ...GRADE, startY: y,
-      head: [["Ano", "Fonte", "Cota em D\n(cm)", "Toler.\n(dias)", "Cobert.\npós-D (%)",
+      head: [["Ano", "Fonte", `${g} em D\n(cm)`, "Toler.\n(dias)", "Cobert.\npós-D (%)",
               "Mín. pós-D\n(cm)", "Delta queda\n(cm)", "Selec.", "Motivo de exclusão"]],
       body: corpo,
       columnStyles: { 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" },
@@ -171,7 +200,7 @@ const ExportarPDF = (() => {
     });
     y = pdf.lastAutoTable.finalY + 6;
 
-    y = tituloSecao(pdf, "4. Projeções resultantes", y);
+    y = tituloSecao(pdf, sec("Projeções resultantes"), y);
     const tj = r.trajetorias;
     if (tj) {
       const datas = Grafico.datasDoAno(r.ano_atual);
@@ -189,7 +218,7 @@ const ExportarPDF = (() => {
       pdf.autoTable({
         ...GRADE, startY: y,
         head: [["Curva", "Ano de referência", "Mínimo projetado (cm)",
-                "Data do mínimo", "Queda desde a cota atual (cm)"]],
+                "Data do mínimo", `Queda desde a ${gMin} atual (cm)`]],
         body: linhas,
         columnStyles: { 2: { halign: "right" }, 4: { halign: "right" } },
       });
@@ -211,22 +240,22 @@ const ExportarPDF = (() => {
         }
         pdf.autoTable({
           ...GRADE, startY: y,
-          head: [["Ponto de controle", "Cota (cm)", "Curva",
+          head: [["Ponto de controle", `${g} (cm)`, "Curva",
                   "Toque de entrada", "Toque de saída"]],
           body: linhasPC,
           columnStyles: { 1: { halign: "right" } },
         });
         y = pdf.lastAutoTable.finalY + 3;
         y = nota(pdf,
-          "Toque de entrada = data em que a projeção cruza a cota do ponto de controle em " +
+          `Toque de entrada = data em que a projeção cruza a ${gMin} do ponto de controle em ` +
           "queda; toque de saída = data em que volta a cruzá-la em subida. Datas interpoladas " +
           "linearmente entre os dias vizinhos ao cruzamento.", y, largura) + 1;
       }
     } else {
-      y = nota(pdf, "Sem projeção (nenhum ano análogo no range).", y, largura) + 3;
+      y = nota(pdf, "Sem projeção (nenhum ano análogo no intervalo).", y, largura) + 3;
     }
 
-    y = tituloSecao(pdf, `5. Série dia a dia (${r.ano_atual})`, y);
+    y = tituloSecao(pdf, sec(`Série dia a dia (${r.ano_atual})`), y);
     const datas = Grafico.datasDoAno(r.ano_atual);
     const obs = docE.anos[String(r.ano_atual)];
     const serieCorpo = [];
@@ -254,8 +283,12 @@ const ExportarPDF = (() => {
                       3: { halign: "right" }, 4: { halign: "right" } },
     });
     y = pdf.lastAutoTable.finalY + 4;
-    nota(pdf, "Fonte: data lake da ANA (banco HIDRO e telemetria) · série integrada " +
-              "(consistido > bruto > telemetria).", Math.min(y, 285), largura);
+    const fonteFinal = s
+      ? `Fonte: séries de ${s.bases.map((b) => b.nome).join(" e ")} (data lake da ANA, banco HIDRO e ` +
+        `telemetria, integradas consistido > bruto > telemetria) combinadas pela fórmula de ${s.fonte_metodo}.`
+      : "Fonte: data lake da ANA (banco HIDRO e telemetria) · série integrada " +
+        "(consistido > bruto > telemetria).";
+    nota(pdf, fonteFinal, Math.min(y, 285), largura);
     return pdf;
   }
 
@@ -275,45 +308,74 @@ const ExportarPDF = (() => {
     pdf.text("Projeções de Nível — Estações-Chave para Hidrovias", larguraPg / 2, 45,
              { align: "center" });
     pdf.setFont("helvetica", "normal").setFontSize(11).setTextColor(60);
-    pdf.text(t("Projeção por analogia · série integrada (HIDRO consistido > bruto > telemetria) · cotas em cm"),
+    pdf.text(t("Projeção por analogia · série integrada (HIDRO consistido > bruto > telemetria) · cotas e profundidades em cm"),
              larguraPg / 2, 54, { align: "center" });
     pdf.text(t(`Gerado do site em ${new Date().toLocaleString("pt-BR")} — com os intervalos ajustados na tela`),
              larguraPg / 2, 61, { align: "center" });
 
-    const corpo = registros.map(({ doc, resultado }) => [
-      doc.nome, doc.rio || "—",
-      doc.ultima_data.split("-").reverse().join("/"), String(doc.ultimo_valor),
-      t(rotuloRange(resultado)), String(resultado.selecionados.length),
-    ]);
+    const sinteticas = registros.filter(({ doc }) => doc.sintetica);
+    const linhasSinteticas = new Set();
+    const corpo = registros.map(({ doc, resultado }, i) => {
+      if (doc.sintetica) linhasSinteticas.add(i);
+      return [
+        doc.sintetica ? `${doc.nome} *` : doc.nome, doc.rio || "—",
+        doc.ultima_data.split("-").reverse().join("/"), String(doc.ultimo_valor),
+        t(rotuloRange(resultado)), String(resultado.selecionados.length),
+      ];
+    });
     pdf.autoTable({
       ...GRADE, startY: 75,
       styles: { ...GRADE.styles, fontSize: 9, cellPadding: 1.8 },
-      head: [["Estação", "Rio", "Último dado", "Cota (cm)", "Intervalo (cota atual ±)", "Anos análogos"]],
+      head: [["Estação", "Rio", "Último dado", sinteticas.length ? "Cota / profund.* (cm)" : "Cota (cm)",
+              "Intervalo (cota atual ±)", "Anos análogos"]],
       body: corpo,
       columnStyles: { 3: { halign: "right" }, 5: { halign: "right" } },
       margin: { left: 60, right: 60 },
+      didParseCell: (d) => {
+        if (d.section === "body" && linhasSinteticas.has(d.row.index)) {
+          d.cell.styles.fillColor = [246, 243, 255];
+        }
+      },
     });
     pdf.setFontSize(8.5).setTextColor(110);
+    if (sinteticas.length) {
+      const fontes = [...new Set(sinteticas.map(({ doc }) => doc.sintetica.fonte_metodo))].join("; ");
+      const bases = [...new Set(sinteticas.flatMap(({ doc }) => doc.sintetica.bases.map((b) => b.nome)))].join(" e ");
+      pdf.text(t(`* Séries sintéticas (profundidade disponível no passo crítico, em cm) calculadas de ${bases} — ${fontes}`),
+               larguraPg / 2, 193, { align: "center" });
+    }
     pdf.text(t("Fonte: data lake da ANA (banco HIDRO e telemetria) · memória de cálculo individual disponível no site"),
              larguraPg / 2, 200, { align: "center" });
 
     for (const { doc, resultado, grafico } of registros) {
       const png = await Plotly.toImage(grafico, { format: "png", width: 1400, height: 680, scale: 2 });
       pdf.addPage();
+      const s = doc.sintetica, gMin = (doc.grandeza || "Cota").toLowerCase();
+      if (s) {
+        // mesmo cartão lilás do painel no site (o PNG do Plotly tem fundo transparente)
+        pdf.setFillColor(246, 243, 255).setDrawColor(207, 196, 236).setLineWidth(0.3);
+        pdf.roundedRect(MARGEM - 6, 8, larguraUtil + 12, 197, 3, 3, "FD");
+      }
       pdf.setFont("helvetica", "bold").setFontSize(14).setTextColor(26);
       pdf.text(doc.nome, MARGEM, MARGEM + 2);
       pdf.setFont("helvetica", "normal").setFontSize(9).setTextColor(85);
-      pdf.text(t(`rio ${doc.rio || "—"} · HidroWeb ${doc.codigo_hidroweb} · equip. ${doc.estcodigo_telemetria} · ` +
+      const identificacao = s
+        ? `série sintética calculada de ${s.bases.map((b) => b.nome).join(" e ")}`
+        : `HidroWeb ${doc.codigo_hidroweb} · equip. ${doc.estcodigo_telemetria}`;
+      pdf.text(t(`rio ${doc.rio || "—"} · ${identificacao} · ` +
                  `último dado ${doc.ultima_data.split("-").reverse().join("/")} (${doc.ultimo_valor} cm, ` +
                  `${doc.fonte_ultimo_dado}) · intervalo ${rotuloRange(resultado)}`),
                MARGEM, MARGEM + 8);
       const altura = larguraUtil * 680 / 1400;
       pdf.addImage(png, "PNG", MARGEM, MARGEM + 12, larguraUtil, altura);
       pdf.setFontSize(8).setTextColor(110);
+      if (s) {
+        pdf.text(t(`${s.formula_texto} · Fonte do método: ${s.fonte_metodo} · ${s.nota_sinal}`), MARGEM, 194);
+      }
       let rodape = resultado.selecionados.length
-        ? t(`Anos análogos (±${fmt(resultado.limite_cm)} cm da cota atual ${fmt(resultado.cota_atual, 0)} cm): ` +
+        ? t(`Anos análogos (±${fmt(resultado.limite_cm)} cm da ${gMin} atual ${fmt(resultado.cota_atual, 0)} cm): ` +
             resultado.selecionados.join(", "))
-        : "Nenhum ano análogo no range.";
+        : "Nenhum ano análogo no intervalo.";
       if (resultado.aviso) rodape += t(` · Aviso: ${resultado.aviso}`);
       pdf.text(rodape, MARGEM, 200);
     }
