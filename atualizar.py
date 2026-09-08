@@ -4,7 +4,16 @@ Os PDFs (conjunto e memórias de cálculo) são gerados no navegador, refletindo
 range ajustado pelo usuário — o pipeline só publica os dados.
 
 Uso:
-    atualizar.py [--full] [--estacao SLUG] [--sem-push]
+    atualizar.py [--full] [--estacao SLUG] [--sem-push] [--sem-login]
+
+Login no data lake: o refresh token é renovado sozinho a cada rodada, mas o
+tenant da ANA exige novo login interativo periodicamente (~60 dias). Para não
+haver interrupção, a rodada agendada (que só roda com o usuário logado):
+  - aos LIMIAR_RENOVACAO_DIAS do último login, abre o navegador para renovar
+    proativamente (com aviso por notificação do Windows); se ninguém responder
+    em TIMEOUT_LOGIN_S, a rodada segue com o token atual e tenta de novo na próxima;
+  - se o token já expirou, faz a mesma tentativa em vez de só falhar.
+`--sem-login` desliga isso (modo somente-cache, comportamento antigo).
 
 Exit codes: 0 ok · 1 falha geral · 2 token expirado (renove com:
     python -c "from ana_datalake import connect; connect('hidro')")
@@ -25,6 +34,8 @@ from estacoes import ESTACOES, ESTACOES_REAIS, ESTACOES_SINTETICAS, POR_SLUG
 
 LOCK = DIR_CACHE / ".lock"
 LOCK_VALIDADE_S = 2 * 3600
+LIMIAR_RENOVACAO_DIAS = 50   # tenant da ANA obriga novo login em ~60 dias (observado)
+TIMEOUT_LOGIN_S = 5 * 60     # quanto o navegador fica aberto esperando o login
 
 log = logging.getLogger("atualizar")
 
@@ -83,11 +94,62 @@ def mesclar_indice(resumos_novos: list[dict]) -> list[dict]:
     return [existentes[s] for s in ordem if s in existentes]
 
 
+def _pedir_login(motivo: str) -> bool:
+    """Abre o navegador para login interativo (com aviso por toast) e espera até TIMEOUT_LOGIN_S."""
+    from ana_datalake.auth import renovar_login_interativo
+    from pipeline import notificar
+
+    log.warning("%s — abrindo navegador para login (até %d min).", motivo, TIMEOUT_LOGIN_S // 60)
+    notificar.toast(
+        "Hidrovias Joaquim: login necessário",
+        f"{motivo}. Conclua o login da ANA na janela do navegador (até {TIMEOUT_LOGIN_S // 60} min).",
+    )
+    ok = renovar_login_interativo(timeout=TIMEOUT_LOGIN_S)
+    if ok:
+        log.info("Login interativo concluído — token renovado.")
+    else:
+        log.warning("Login interativo não concluído (sem resposta ou cancelado).")
+    return ok
+
+
+def conectar(permitir_login: bool):
+    """Conexão com o data lake, renovando o login no navegador quando preciso.
+
+    Retorna None (e loga o erro) se não houver token e não for possível renovar.
+    """
+    from ana_datalake import connect
+    from ana_datalake.auth import dias_desde_login
+
+    if permitir_login:
+        idade = dias_desde_login()
+        if idade is not None and idade >= LIMIAR_RENOVACAO_DIAS:
+            # Proativo: o token ainda funciona, mas está perto de o tenant exigir novo
+            # login. Se ninguém responder, a rodada segue normalmente com o token atual.
+            _pedir_login(f"Último login há {idade:.0f} dias")
+
+    try:
+        return connect("hidro", interactive=False)
+    except Exception as exc:  # token expirado / sem cache MSAL
+        if permitir_login and _pedir_login("Token do data lake expirou"):
+            try:
+                return connect("hidro", interactive=False)
+            except Exception as exc2:
+                exc = exc2
+        log.error(
+            "Falha de autenticação no Synapse: %s\n"
+            "Renove o token com: python -c \"from ana_datalake import connect; connect('hidro')\"",
+            exc,
+        )
+        return None
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--full", action="store_true", help="refaz o cache da(s) estação(ões) do zero")
     p.add_argument("--estacao", metavar="SLUG", help="processa só esta estação")
     p.add_argument("--sem-push", action="store_true")
+    p.add_argument("--sem-login", action="store_true",
+                   help="nunca abre o navegador: falha (exit 2) se o token do cache expirou")
     args = p.parse_args()
 
     configurar_log()
@@ -110,15 +172,8 @@ def main() -> int:
     try:
         conn = None
         if alvos:
-            from ana_datalake import connect
-            try:
-                conn = connect("hidro", interactive=False)
-            except Exception as exc:  # token expirado / sem cache MSAL
-                log.error(
-                    "Falha de autenticação no Synapse: %s\n"
-                    "Renove o token com: python -c \"from ana_datalake import connect; connect('hidro')\"",
-                    exc,
-                )
+            conn = conectar(permitir_login=not args.sem_login)
+            if conn is None:
                 return 2
 
         from pipeline import fetch, integrar, exportar_json, sinteticas
