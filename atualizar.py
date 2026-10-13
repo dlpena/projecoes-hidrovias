@@ -143,6 +143,29 @@ def conectar(permitir_login: bool):
         return None
 
 
+FONTE_MARINHA = {
+    "chave": "marinha",
+    "nome": "Marinha do Brasil, CHN-6 (cotas diárias publicadas em PDF)",
+    "regra": "usada só nos dias sem dado da ANA (consistido > bruto > telemetria > Marinha)",
+}
+
+
+def fonte_marinha(est: dict, integrada):
+    """Série da Marinha para complementar a estação, ou None (indisponível ou zero diferente).
+
+    Falha da Marinha nunca derruba a estação: a rodada segue só com a ANA.
+    """
+    from pipeline import marinha
+    try:
+        df = marinha.buscar(est["slug"], est["marinha_pdf"])
+    except Exception:
+        log.exception("%s: falha ao ler a Marinha — seguindo só com a ANA", est["slug"])
+        return None
+    if df is None or df.empty or not marinha.verificar_zero(est["slug"], integrada, df):
+        return None
+    return df
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--full", action="store_true", help="refaz o cache da(s) estação(ões) do zero")
@@ -176,7 +199,7 @@ def main() -> int:
             if conn is None:
                 return 2
 
-        from pipeline import fetch, integrar, exportar_json, sinteticas
+        from pipeline import fetch, integrar, exportar_json, sinteticas, marinha
 
         resumos, falhas = [], []
         for est in alvos:
@@ -185,7 +208,14 @@ def main() -> int:
                 integrada = integrar.serie_integrada(df_hidro, df_tele)
                 if integrada.empty:
                     raise RuntimeError("série integrada vazia")
-                resumos.append(exportar_json.exportar_estacao(est, integrada, df_hidro, df_tele))
+                df_mar, meta_mar = None, None
+                if est.get("marinha_pdf"):
+                    df_mar = fonte_marinha(est, integrada)
+                    if df_mar is not None:
+                        integrada = marinha.complementar(integrada, df_mar)
+                        meta_mar = {"fonte_complementar": FONTE_MARINHA}
+                resumos.append(exportar_json.exportar_estacao(
+                    est, integrada, df_hidro, df_tele, meta_extra=meta_mar, df_marinha=df_mar))
                 log.info("%s: JSON exportado (última data %s)", est["slug"], resumos[-1]["ultima_data"])
             except Exception:
                 log.exception("%s: falha — mantendo JSON anterior", est["slug"])

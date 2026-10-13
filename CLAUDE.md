@@ -13,6 +13,13 @@ irmãos) ficam em `CLAUDE.local.md`, não versionado.
 
 - Cota em **cm** (HIDRO e telemetria). Série integrada: consistido (nível 2) > bruto (nível 1) > telemetria,
   resolvida dia a dia (`compor_serie_integrada`).
+- **Fallback da Marinha (só PORTO MURTINHO, chave `marinha_pdf` em `estacoes.py`)**: régua da
+  Marinha (CHN-6, PDF diário `PORTO MURTINHO_DD.pdf`, dias úteis) entra como 4ª fonte, só nos
+  dias sem nenhum dado da ANA (consistido > bruto > telemetria > marinha), via
+  `pipeline/marinha.py`. A cada rodada `verificar_zero` compara ANA × Marinha na sobreposição
+  recente e descarta a Marinha se a mediana da diferença passar de 3 cm (mudança de zero).
+  Falha da Marinha nunca derruba a estação. O PDF usado fica em `dados/cache/` com URL e data
+  de modificação (proveniência). Front-end trata via `doc.fonte_complementar`.
 - Cache incremental em `dados/cache/` com fronteiras de congelamento INDEPENDENTES para HIDRO e
   telemetria (`pipeline/fetch.py`): HIDRO congela em
   `{slug}_consistido.parquet`, telemetria em `{slug}_telemetria.parquet`, cada um com sua data em

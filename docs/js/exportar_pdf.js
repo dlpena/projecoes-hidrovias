@@ -53,7 +53,7 @@ const ExportarPDF = (() => {
     const cf = docE.cobertura_fontes;
     if (!cf || !Object.keys(cf).length) return y;
     const ROTULOS = { consistido: "HIDRO consistido", bruto: "HIDRO bruto",
-                      telemetria: "Telemetria" };
+                      telemetria: "Telemetria", marinha: "Marinha (CHN-6)" };
     let anoMin = Infinity, anoMax = -Infinity;
     for (const cob of Object.values(cf)) {
       for (const a of Object.keys(cob)) {
@@ -65,7 +65,7 @@ const ExportarPDF = (() => {
     const n = anoMax - anoMin + 1;
     const rotuloW = 28, altura = 4;
     const celW = (largura - rotuloW) / n;
-    for (const fonte of ["consistido", "bruto", "telemetria"]) {
+    for (const fonte of ["consistido", "bruto", "telemetria", "marinha"]) {
       const cob = cf[fonte];
       if (!cob) continue;
       pdf.setFont("helvetica", "normal").setFontSize(6.5).setTextColor(85);
@@ -169,7 +169,12 @@ const ExportarPDF = (() => {
         "Cor = % de dias do ano com dado na fonte (verde 100% · amarelo 50% · vermelho 0%; " +
         "branco = sem dado). A série integrada usa, dia a dia, a fonte de maior prioridade " +
         "disponível (consistido > bruto > telemetria). A telemetria é consultada apenas na " +
-        "janela recente ainda não coberta pelo histórico congelado do HIDRO.", y, largura);
+        "janela recente ainda não coberta pelo histórico congelado do HIDRO." +
+        (docE.fonte_complementar
+          ? " Nesta estação, os dias sem nenhum dado da ANA vêm da régua da Marinha (CHN-6), " +
+            "mesma régua e mesmo zero, conferidos a cada rodada pela sobreposição com a ANA " +
+            "(consistido > bruto > telemetria > Marinha)."
+          : ""), y, largura);
     }
 
     y = tituloSecao(pdf, sec("Universo de anos candidatos"), y + 1);
@@ -286,8 +291,11 @@ const ExportarPDF = (() => {
     const fonteFinal = s
       ? `Fonte: séries de ${s.bases.map((b) => b.nome).join(" e ")} (data lake da ANA, banco HIDRO e ` +
         `telemetria, integradas consistido > bruto > telemetria) combinadas pela fórmula de ${s.fonte_metodo}.`
-      : "Fonte: data lake da ANA (banco HIDRO e telemetria) · série integrada " +
-        "(consistido > bruto > telemetria).";
+      : docE.fonte_complementar
+        ? "Fonte: data lake da ANA (banco HIDRO e telemetria) e, nos dias sem dado da ANA, " +
+          `${docE.fonte_complementar.nome} · série integrada (consistido > bruto > telemetria > Marinha).`
+        : "Fonte: data lake da ANA (banco HIDRO e telemetria) · série integrada " +
+          "(consistido > bruto > telemetria).";
     nota(pdf, fonteFinal, Math.min(y, 285), largura);
     return pdf;
   }
@@ -344,7 +352,12 @@ const ExportarPDF = (() => {
       pdf.text(t(`* Séries sintéticas (profundidade disponível no passo crítico, em cm) calculadas de ${bases} — ${fontes}`),
                larguraPg / 2, 193, { align: "center" });
     }
-    pdf.text(t("Fonte: data lake da ANA (banco HIDRO e telemetria) · memória de cálculo individual disponível no site"),
+    const complementadas = registros.filter(({ doc }) => doc.fonte_complementar).map(({ doc }) => doc.nome);
+    pdf.text(t("Fonte: data lake da ANA (banco HIDRO e telemetria)" +
+               (complementadas.length
+                 ? ` e Marinha (CHN-6) nos dias sem dado da ANA em ${complementadas.join(", ")}`
+                 : "") +
+               " · memória de cálculo individual disponível no site"),
              larguraPg / 2, 200, { align: "center" });
 
     for (const { doc, resultado, grafico } of registros) {

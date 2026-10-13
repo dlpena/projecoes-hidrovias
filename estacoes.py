@@ -84,8 +84,13 @@ ESTACOES = [
     # --- Paraguai ---
     {"slug": "ladario", "nome": "LADÁRIO (BASE NAVAL)", "rio": "Paraguai",
      "estcodigo_telemetria": 190057360, "codigo_hidroweb": 66825000},
+    # Fallback: régua da Marinha (CHN-6), PDF diário "PORTO MURTINHO_DD.pdf" —
+    # mesma régua, mesmo zero (mediana da diferença 0 cm em 2021-2026, ver
+    # docstring de pipeline/marinha.py). Entra só nos dias sem dado da ANA
+    # (a telemetria 214257560 parou em 06/09/2026).
     {"slug": "porto-murtinho", "nome": "PORTO MURTINHO", "rio": "Paraguai",
-     "estcodigo_telemetria": 214257560, "codigo_hidroweb": 67100000},
+     "estcodigo_telemetria": 214257560, "codigo_hidroweb": 67100000,
+     "marinha_pdf": "PORTO MURTINHO"},
 ]
 
 POR_SLUG = {e["slug"]: e for e in ESTACOES}

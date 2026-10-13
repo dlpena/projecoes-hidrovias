@@ -80,7 +80,8 @@ def _cobertura_anual(datas: pd.Series) -> dict[str, int]:
 
 
 def cobertura_fontes(df_hidro: pd.DataFrame | None,
-                     df_tele: pd.DataFrame | None) -> dict:
+                     df_tele: pd.DataFrame | None,
+                     df_marinha: pd.DataFrame | None = None) -> dict:
     """Cobertura anual por fonte, ANTES da integração (para auditoria).
 
     Telemetria: o pipeline só consulta a janela recente (o histórico coberto
@@ -93,6 +94,8 @@ def cobertura_fontes(df_hidro: pd.DataFrame | None,
         fontes["bruto"] = _cobertura_anual(df_hidro.loc[df_hidro["nivel"] == 1, "data"])
     if df_tele is not None and not df_tele.empty:
         fontes["telemetria"] = _cobertura_anual(df_tele["HORDATAHORA"])
+    if df_marinha is not None and not df_marinha.empty:
+        fontes["marinha"] = _cobertura_anual(df_marinha["data"])
     return {f: c for f, c in fontes.items() if c}
 
 
@@ -107,7 +110,8 @@ def _filtrar_cobertura(cobertura: dict, incluir_ano) -> dict:
 def exportar_estacao(estacao: dict, integrada: pd.DataFrame,
                      df_hidro: pd.DataFrame | None = None,
                      df_tele: pd.DataFrame | None = None,
-                     meta_extra: dict | None = None) -> dict:
+                     meta_extra: dict | None = None,
+                     df_marinha: pd.DataFrame | None = None) -> dict:
     """Grava docs/dados/{slug}_historico.json e {slug}_atual.json.
 
     Retorna o resumo para o indice.json. Se a estação define `ano_inicio`
@@ -131,7 +135,7 @@ def exportar_estacao(estacao: dict, integrada: pd.DataFrame,
     ultima = integrada.iloc[-1]
     ano_atual = int(ultima["data"].year)
     agora = datetime.now().astimezone().isoformat(timespec="seconds")
-    cobertura = cobertura_fontes(df_hidro, df_tele)
+    cobertura = cobertura_fontes(df_hidro, df_tele, df_marinha)
     if ano_inicio:
         cobertura = _filtrar_cobertura(cobertura, lambda a: a >= ano_inicio)
 
