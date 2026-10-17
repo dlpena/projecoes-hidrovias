@@ -29,17 +29,21 @@ $toast = [Windows.UI.Notifications.ToastNotification]::new($xml)
 
 
 def toast(titulo: str, mensagem: str) -> bool:
-    """Exibe uma notificação do Windows. Retorna False se não conseguiu (sem exceção)."""
+    """Dispara uma notificação do Windows sem esperar por ela.
+
+    O PowerShell pode levar dezenas de segundos para carregar o WinRT (em
+    17/10/2026 passou de 30 s e atrasou a rodada), então o processo roda solto:
+    a rodada segue na hora e o aviso aparece quando o PowerShell terminar.
+    Retorna False só se nem foi possível iniciar o PowerShell.
+    """
     env = dict(os.environ, TOAST_TITULO=titulo, TOAST_MENSAGEM=mensagem, TOAST_APPID=_APP_ID)
     try:
-        r = subprocess.run(
+        subprocess.Popen(
             ["powershell", "-NoProfile", "-NonInteractive", "-Command", _SCRIPT],
-            env=env, capture_output=True, text=True, timeout=30,
+            env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
-    except (OSError, subprocess.TimeoutExpired) as exc:
+    except OSError as exc:
         log.warning("Notificação não exibida: %s", exc)
-        return False
-    if r.returncode != 0:
-        log.warning("Notificação não exibida: %s", (r.stderr or "").strip()[:300])
         return False
     return True

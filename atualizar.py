@@ -36,6 +36,8 @@ LOCK = DIR_CACHE / ".lock"
 LOCK_VALIDADE_S = 2 * 3600
 LIMIAR_RENOVACAO_DIAS = 50   # tenant da ANA obriga novo login em ~60 dias (observado)
 TIMEOUT_LOGIN_S = 5 * 60     # quanto o navegador fica aberto esperando o login
+TENTATIVAS_REDE = 3          # conexões tentadas quando a falha é de rede, não de token
+ESPERA_REDE_S = 60           # pausa entre essas tentativas
 
 log = logging.getLogger("atualizar")
 
@@ -127,20 +129,45 @@ def conectar(permitir_login: bool):
             # login. Se ninguém responder, a rodada segue normalmente com o token atual.
             _pedir_login(f"Último login há {idade:.0f} dias")
 
-    try:
-        return connect("hidro", interactive=False)
-    except Exception as exc:  # token expirado / sem cache MSAL
+    exc = _conectar_com_retentativa(connect)
+    if not isinstance(exc, Exception):
+        return exc  # conexão
+    if _token_expirado(exc):
         if permitir_login and _pedir_login("Token do data lake expirou"):
-            try:
-                return connect("hidro", interactive=False)
-            except Exception as exc2:
-                exc = exc2
+            exc = _conectar_com_retentativa(connect)
+            if not isinstance(exc, Exception):
+                return exc
         log.error(
             "Falha de autenticação no Synapse: %s\n"
             "Renove o token com: python -c \"from ana_datalake import connect; connect('hidro')\"",
             exc,
         )
-        return None
+    else:
+        # Falha de rede (login.microsoftonline.com ou Synapse fora do ar, conexão
+        # derrubada): o token pode estar ótimo — não adianta abrir o navegador.
+        log.error("Sem conexão com o data lake após %d tentativas (falha de rede, não de token): %s",
+                  TENTATIVAS_REDE, exc)
+    return None
+
+
+def _token_expirado(exc: Exception) -> bool:
+    """True só quando o MSAL não tem token válido (get_access_token levanta RuntimeError
+    'Nao foi possivel autenticar'). Erros de rede — conexão derrubada na descoberta da
+    autoridade (caso de 17/10/2026, erro 10054) ou no Synapse — chegam como outros tipos."""
+    return isinstance(exc, RuntimeError) and "Nao foi possivel autenticar" in str(exc)
+
+
+def _conectar_com_retentativa(connect):
+    """Conexão, ou a última exceção. Refaz só falhas de rede; token expirado volta na hora."""
+    for tentativa in range(1, TENTATIVAS_REDE + 1):
+        try:
+            return connect("hidro", interactive=False)
+        except Exception as exc:  # noqa: BLE001 — classificado abaixo
+            if _token_expirado(exc) or tentativa == TENTATIVAS_REDE:
+                return exc
+            log.warning("Falha ao conectar ao data lake (tentativa %d/%d, nova em %d s): %s",
+                        tentativa, TENTATIVAS_REDE, ESPERA_REDE_S, exc)
+            time.sleep(ESPERA_REDE_S)
 
 
 FONTE_MARINHA = {
