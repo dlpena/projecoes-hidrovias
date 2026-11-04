@@ -185,6 +185,9 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
 }
 .aviso:empty { display: none; }
 
+.regime { color: var(--tinta-2); font-size: 0.82rem; margin: 8px 2px 0; }
+.regime:empty { display: none; }
+
 .grafico { width: 100%; height: 440px; }
 
 .estacao-rodape { color: var(--tinta-3); font-size: 0.78rem; margin: 6px 2px 0; }
@@ -240,3 +243,17 @@ main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
 .cor-maior { color: #D55E00; }
 .cor-menor { color: #0072B2; }
 .cor-media { color: #009E73; }
+
+/* página de metodologia */
+.metodologia { max-width: 920px; margin: 0 auto; padding: 8px 20px 40px; line-height: 1.6; font-size: 0.95rem; }
+.metodologia h2 { font-size: 1.15rem; margin: 30px 0 8px; padding-top: 14px; border-top: 1px solid var(--borda); }
+.metodologia h2:first-of-type { border-top: none; padding-top: 0; }
+.metodologia h3 { font-size: 1rem; margin: 18px 0 6px; }
+.metodologia ol, .metodologia ul { padding-left: 22px; }
+.metodologia li { margin-bottom: 6px; }
+.metodologia figure { margin: 16px 0 22px; }
+.metodologia figure img { width: 100%; height: auto; border: 1px solid var(--borda); border-radius: 8px; background: #fff; }
+.metodologia figcaption { color: var(--tinta-2); font-size: 0.85rem; margin-top: 6px; }
+.metodologia .indice { background: #f4f3ef; border: 1px solid var(--borda); border-radius: 8px; padding: 10px 16px; font-size: 0.9rem; }
+.metodologia .indice ol { margin: 4px 0; }
+.metodologia code { font-size: 0.88em; }

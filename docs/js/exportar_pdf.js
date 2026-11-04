@@ -136,9 +136,14 @@ const ExportarPDF = (() => {
       `Regras: ${gMin} do candidato no dia D com tolerância de ±3 dias (mais próximo primeiro; ` +
       `empate favorece o dia anterior); seleção se |${gMin} − ${gMin} atual| ≤ intervalo; exige-se ≥80% ` +
       `de cobertura entre D e 31/dez e dado nos últimos 10 dias do ano; delta de queda = ${gMin} ` +
-      `em D − mínimo pós-D; trajetórias deslocadas para coincidir com a ${gMin} atual em D; ` +
+      `em D − mínimo pós-D; delta de subida = máximo pós-D − ${gMin} em D; regime dos análogos ` +
+      "pela data média (circular) do mínimo e do máximo de cada análogo no ciclo de 365 dias " +
+      "centrado em D: descida se o próximo extremo médio é o mínimo, subida se é o máximo; " +
+      "curvas: descida, maior e menor queda; subida, menor e maior subida; " +
+      `trajetórias deslocadas para coincidir com a ${gMin} atual em D; ` +
       "lacunas internas interpoladas linearmente (marcadas na seção de série dia a dia). Este " +
       "documento reflete o intervalo ajustado na tela no momento da exportação.", y, largura);
+    if (r.regime) y = nota(pdf, t(Grafico.textoRegime(r)), y, largura);
     if (r.aviso) y = nota(pdf, `Aviso: ${r.aviso}`, y, largura);
 
     if (s) {
@@ -186,46 +191,56 @@ const ExportarPDF = (() => {
         String(c.ano), fpa[String(c.ano)] || "", fmt(c.cota_em_d, 0),
         c.dias_tolerancia === null ? "" : String(c.dias_tolerancia),
         c.cobertura === null ? "" : fmt(c.cobertura * 100, 0),
-        fmt(c.min_pos_d, 0), fmt(c.delta, 0),
+        fmt(c.min_pos_d, 0), fmt(c.delta, 0), fmt(c.subida, 0),
+        c.dia_min_ciclo === null ? "" : String(c.dia_min_ciclo),
+        c.dia_max_ciclo === null ? "" : String(c.dia_max_ciclo),
         c.selecionado ? "sim" : "não", c.motivo || "",
       ];
     });
     pdf.autoTable({
       ...GRADE, startY: y,
       head: [["Ano", "Fonte", `${g} em D\n(cm)`, "Toler.\n(dias)", "Cobert.\npós-D (%)",
-              "Mín. pós-D\n(cm)", "Delta queda\n(cm)", "Selec.", "Motivo de exclusão"]],
+              "Mín. pós-D\n(cm)", "Delta queda\n(cm)", "Delta subida\n(cm)",
+              "Dia do mín.\ndo ciclo", "Dia do máx.\ndo ciclo", "Selec.", "Motivo de exclusão"]],
       body: corpo,
       columnStyles: { 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" },
-                      5: { halign: "right" }, 6: { halign: "right" } },
+                      5: { halign: "right" }, 6: { halign: "right" }, 7: { halign: "right" },
+                      8: { halign: "right" }, 9: { halign: "right" } },
       didParseCell: (d) => {
         if (d.section === "body" && selecionadas.has(d.row.index)) {
           d.cell.styles.fillColor = [238, 245, 251];
         }
       },
     });
-    y = pdf.lastAutoTable.finalY + 6;
+    y = pdf.lastAutoTable.finalY + 2;
+    y = nota(pdf, "Dia do mínimo e dia do máximo do ciclo: dias em relação a D (negativo = antes " +
+                  "de D) no ciclo de 365 dias centrado em D, só para os selecionados.", y, largura) + 3;
 
     y = tituloSecao(pdf, sec("Projeções resultantes"), y);
     const tj = r.trajetorias;
     if (tj) {
       const datas = Grafico.datasDoAno(r.ano_atual);
       const linhas = [];
+      const brD = (iso) => (iso ? iso.split("-").reverse().join("/") : "");
       for (const [nome, serie, ano] of [
-        ["Maior queda", tj.maior_queda, String(r.ano_maior_queda)],
-        ["Menor queda", tj.menor_queda, String(r.ano_menor_queda)],
+        ...Grafico.curvasExtremas(r).map((c) => [c.nome, c.serie, String(c.ano)]),
         ["Média", tj.media, `${r.selecionados.length} anos`],
       ]) {
         const { min, dataMin } = Grafico.minimoTrajetoria(serie, datas, r.idx_d);
-        linhas.push([nome, ano, fmt(min, 0),
-                     dataMin ? dataMin.split("-").reverse().join("/") : "",
-                     min === null ? "" : fmt(r.cota_atual - min, 0)]);
+        const { max, dataMax } = Grafico.maximoTrajetoria(serie, datas, r.idx_d);
+        linhas.push([nome, ano, fmt(min, 0), brD(dataMin),
+                     min === null ? "" : fmt(r.cota_atual - min, 0),
+                     fmt(max, 0), brD(dataMax),
+                     max === null ? "" : fmt(max - r.cota_atual, 0)]);
       }
       pdf.autoTable({
         ...GRADE, startY: y,
-        head: [["Curva", "Ano de referência", "Mínimo projetado (cm)",
-                "Data do mínimo", `Queda desde a ${gMin} atual (cm)`]],
+        head: [["Curva", "Ano de\nreferência", "Mínimo\nprojetado (cm)", "Data do\nmínimo",
+                `Queda desde a\n${gMin} atual (cm)`, "Máximo\nprojetado (cm)", "Data do\nmáximo",
+                `Subida desde a\n${gMin} atual (cm)`]],
         body: linhas,
-        columnStyles: { 2: { halign: "right" }, 4: { halign: "right" } },
+        columnStyles: { 2: { halign: "right" }, 4: { halign: "right" },
+                        5: { halign: "right" }, 7: { halign: "right" } },
       });
       y = pdf.lastAutoTable.finalY + 6;
       if (temPc1 || temPc2) {
@@ -234,9 +249,9 @@ const ExportarPDF = (() => {
         for (const [rotulo, alvo] of [["Ponto de controle 1", temPc1 ? r.pc1 : null],
                                       ["Ponto de controle 2", temPc2 ? r.pc2 : null]]) {
           if (alvo === null) continue;
-          for (const [nome, serie] of [["Maior queda", tj.maior_queda],
-                                       ["Menor queda", tj.menor_queda],
-                                       ["Média", tj.media]]) {
+          for (const [nome, serie] of [
+            ...Grafico.curvasExtremas(r).map((c) => [c.nome, c.serie]),
+            ["Média", tj.media]]) {
             const { entrada, saida } = Grafico.cruzamentosTrajetoria(serie, datas, r.idx_d, alvo);
             linhasPC.push([rotulo, fmt(alvo, 0), nome,
                            entrada ? dataBR(entrada.data) : "não atinge",
@@ -269,20 +284,22 @@ const ExportarPDF = (() => {
       const temObs = obs[i] !== null && obs[i] !== undefined;
       const temProj = tj && i >= r.idx_d;
       if (!temObs && !temProj) continue;
-      const interp = temProj && (tj.maior_queda_interp[i] || tj.menor_queda_interp[i]);
+      const interp = temProj && (tj.inferior_interp[i] || tj.superior_interp[i]);
       serieCorpo.push([
         datas[i].split("-").reverse().join("/"),
         temObs ? fmt(obs[i], 0) : "",
-        temProj ? fmt(tj.maior_queda[i]) : "",
-        temProj ? fmt(tj.menor_queda[i]) : "",
+        temProj ? fmt(tj.inferior[i]) : "",
+        temProj ? fmt(tj.superior[i]) : "",
         temProj ? fmt(tj.media[i]) : "",
         interp ? "sim" : "",
       ]);
     }
     pdf.autoTable({
       ...GRADE, startY: y,
-      head: [["Data", "Observado (cm)", "Proj. maior queda (cm)",
-              "Proj. menor queda (cm)", "Proj. média (cm)", "Interpolado"]],
+      head: [["Data", "Observado (cm)",
+              `Proj. ${(Grafico.NOME_CRITERIO[r.criterio_inferior] || "curva inferior").toLowerCase()} (cm)`,
+              `Proj. ${(Grafico.NOME_CRITERIO[r.criterio_superior] || "curva superior").toLowerCase()} (cm)`,
+              "Proj. média (cm)", "Interpolado"]],
       body: serieCorpo,
       columnStyles: { 1: { halign: "right" }, 2: { halign: "right" },
                       3: { halign: "right" }, 4: { halign: "right" } },

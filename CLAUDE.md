@@ -31,7 +31,26 @@ irmãos) ficam em `CLAUDE.local.md`, não versionado.
   `pipeline/analogia.py` (fonte da verdade das regras, coberta por `tests/test_analogia.py`) e
   `docs/js/analogia.js` (site, intervalo dinâmico). O pipeline **não chama** `pipeline/analogia.py`
   em produção (só os testes) — desde que as exportações passaram a ser geradas no navegador, o
-  módulo Python existe só para garantir paridade de regras com o JS.
+  módulo Python existe só para garantir paridade de regras com o JS. Desde nov/2026 os dois
+  arquivos são **idênticos byte a byte aos do painel Belo Monte** (`..\analogia-belo-monte`,
+  conferir com `cmp`), inclusive o horizonte em meses; aqui o site chama sempre o horizonte
+  padrão (até 31/dez), e `calcularNoAno` em `grafico.js` repõe as trajetórias (alinhadas a
+  `datas_proj`) nas 366 posições do ano usadas pelo restante do front-end.
+- **Curvas destacadas por regime dos análogos** (nov/2026): o regime é decidido pelo conjunto,
+  pela data média (circular) do mínimo e do máximo de cada análogo no ciclo de 365 dias centrado
+  em D. Próximo extremo médio = mínimo: descida (maior/menor queda); = máximo: subida
+  (menor/maior subida), mesmo que alguns análogos ainda desçam. Critério único, sem estado de
+  transição: o usuário rejeitou misturar maior queda com maior subida. O delta continua
+  individual, até 31/dez. Resultado em `regime`, `ciclo`, `ano_inferior/superior`,
+  `criterio_inferior/superior`, trajetórias `inferior/superior`. Avaliação retrospectiva
+  (01/10 a 04/11/2026, 14 séries) feita antes da escolha; a regra troca de regime perto da data
+  média do mínimo, sobretudo no Tapajós.
+- **Página de metodologia** (`docs/metodologia.html`, link no topo do painel e do histórico) com
+  figuras em `docs/img/metodologia/`, geradas à mão por `ferramentas/figuras_metodologia.py`
+  (mesmo script do Belo Monte; números só dentro das figuras, calculados pelo
+  `pipeline/analogia.py`). Mudou a regra, regerar as figuras e revisar o texto (anti-slop).
+- Scripts e CSS com `?v=N` em `index.html`/`historico.html`: subir N a cada mudança de JS/CSS
+  (sem isso o navegador pode misturar `analogia.js` velho com `grafico.js` novo).
 - Front-end: HTML+JS puro, sem build, Plotly e jsPDF vendorizados em `docs/vendor/` (não usar CDN — o
   site deve ser autocontido para internalização na ANA).
 - **Exportações (PDF do conjunto, memória de cálculo em PDF e CSV) são geradas no navegador**

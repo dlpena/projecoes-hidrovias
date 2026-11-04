@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Projeções de Nível — Estações-Chave para Hidrovias</title>
-  <link rel="stylesheet" href="css/estilo.css">
+  <link rel="stylesheet" href="css/estilo.css?v=3">
   <script src="vendor/plotly.min.js"></script>
 </head>
 <body>
@@ -18,6 +18,7 @@
       <div class="topo-meta">
         <span id="carimbo">Carregando…</span>
         <a href="historico.html" class="link-secundario">Histórico completo →</a>
+        <a href="metodologia.html" class="link-secundario">Metodologia</a>
         <button id="btn-ajuda" type="button" title="Como as projeções são calculadas">Como funciona?</button>
         <button id="btn-pdf-conjunto" type="button" disabled
                 title="PDF com todos os gráficos exatamente como estão na tela (intervalos ajustados)">Baixar PDF do conjunto</button>
@@ -35,7 +36,7 @@
     <div class="ajuda-corpo">
       <h3>A ideia em uma frase</h3>
       <p>Olhamos como o rio se comportou, <strong>em anos passados parecidos com o atual</strong>,
-      daqui até o fim do ano — e mostramos o pior caso, o melhor caso e o caso médio.</p>
+      daqui até o fim do ano, e mostramos o caso mais baixo, o mais alto e o médio.</p>
 
       <h3>Passo a passo</h3>
       <ol>
@@ -44,28 +45,33 @@
         pontilhada).</li>
         <li><strong>Procurar anos parecidos.</strong> Voltamos ao histórico e perguntamos: em
         que anos, <em>neste mesmo dia do calendário</em>, o rio estava com cota próxima da
-        atual? "Próxima" significa dentro do <strong>Intervalo</strong> que você controla —
-        por exemplo, ±10 cm quer dizer até 10 cm acima ou abaixo da cota atual. Esses são os
+        atual? "Próxima" significa dentro do <strong>Intervalo</strong> que você controla.
+        Por exemplo, ±10 cm quer dizer até 10 cm acima ou abaixo da cota atual. Esses são os
         <strong>anos análogos</strong> (listados abaixo de cada gráfico).</li>
         <li><strong>Ver o que aconteceu depois.</strong> Para cada ano análogo, pegamos a
-        trajetória da cota daquele dia até 31/dez e medimos a queda até o mínimo. Essas
-        trajetórias aparecem em cinza-claro, deslocadas para começar exatamente na cota atual
-        — assim todas partem do mesmo ponto e ficam comparáveis.</li>
-        <li><strong>As três curvas.</strong>
-          <span class="cor-maior">■</span> <strong>Maior queda</strong>: o ano análogo em que o
-          rio mais desceu (cenário mais severo).
-          <span class="cor-menor">■</span> <strong>Menor queda</strong>: o ano em que menos
-          desceu (cenário mais favorável).
+        trajetória da cota daquele dia até 31/dez e medimos a queda até o mínimo e a subida até o
+        máximo. Essas trajetórias aparecem em cinza-claro, deslocadas para começar exatamente na
+        cota atual, para que todas partam do mesmo ponto e fiquem comparáveis.</li>
+        <li><strong>Descida ou subida.</strong> Pelas datas médias do mínimo e do máximo dos anos
+        análogos, o painel decide se o conjunto ainda desce rumo ao mínimo ou já sobe rumo ao
+        máximo. O regime aparece escrito acima de cada gráfico.</li>
+        <li><strong>As três curvas.</strong> Na descida,
+          <span class="cor-maior">■</span> <strong>Maior queda</strong> (cenário mais severo) e
+          <span class="cor-menor">■</span> <strong>Menor queda</strong> (mais favorável). Na subida,
+          <span class="cor-maior">■</span> <strong>Menor subida</strong> e
+          <span class="cor-menor">■</span> <strong>Maior subida</strong>.
           <span class="cor-media">■</span> <strong>Média</strong> (pontilhada): a média, dia a
-          dia, de todos os anos análogos. Os pontos coloridos marcam o mínimo de cada curva,
-          com o valor em cm.</li>
+          dia, de todos os anos análogos. Os pontos coloridos marcam o mínimo de cada curva na
+          descida e o máximo na subida, com o valor em cm.</li>
       </ol>
+      <p>A <a href="metodologia.html" class="link-secundario">página de metodologia</a> explica
+      cada passo com figuras.</p>
 
-      <h3>O Intervalo — e por que ele importa</h3>
+      <h3>O Intervalo e por que ele importa</h3>
       <p>Intervalo pequeno = anos muito parecidos com o atual, porém poucos; intervalo grande =
       mais anos, porém menos parecidos. Cada gráfico abre com o menor intervalo (a partir de
-      ±50 cm) que garante <strong>pelo menos 3 anos análogos</strong>. Você pode ajustá-lo em
-      cm ou em % da cota atual — ao trocar a unidade, o valor é convertido, sem mudar a seleção.
+      ±50 cm) que reúne <strong>pelo menos 3 anos análogos</strong>. Você pode ajustá-lo em
+      cm ou em % da cota atual. Ao trocar a unidade, o valor é convertido, sem mudar a seleção.
       Mexa no controle e veja a sensibilidade: o número de anos análogos e as curvas se
       atualizam na hora.</p>
 
@@ -79,7 +85,7 @@
         telemetria (a memória de cálculo mostra a cobertura de cada fonte).</li>
       </ul>
 
-      <h3>Séries sintéticas — passos críticos do Tapajós</h3>
+      <h3>Séries sintéticas: passos críticos do Tapajós</h3>
       <p>Os painéis de <strong>fundo lilás</strong> (Lago do Roque, Monte Cristo e Itapaiunas) não
       são estações: são passos críticos de navegação entre Itaituba e Santarém, sem régua própria.
       A série mostrada é a <strong>profundidade disponível no passo</strong>, calculada dia a dia
@@ -90,48 +96,41 @@
         <li>Monte Cristo = 0,825 × Itaituba + 0,175 × Santarém − 1,99</li>
         <li>Itapaiunas = 0,300 × Itaituba + 0,700 × Santarém − 1,36</li>
       </ul>
-      <p>O resultado é publicado em cm inteiros (profundidade × 100) e só existe nos dias em que
+      <p>O resultado é publicado em cm inteiros (profundidade × 100) e existe apenas nos dias em que
       as duas bases têm dado. <strong>Valores ≤ 0 indicam passo acima do nível d'água</strong> (a
       linha vermelha do zero marca essa referência). A projeção por analogia funciona exatamente
       como nas estações, sobre a série de profundidade; o intervalo em % é relativo à
       profundidade atual. A fórmula e a fonte constam no painel, no CSV e na memória de cálculo.</p>
 
       <h3>Como ler (e como não ler)</h3>
-      <p>Isto <strong>não é uma previsão meteorológica</strong>: é uma projeção por analogia —
+      <p>Isto <strong>não é uma previsão meteorológica</strong>. É uma projeção por analogia:
       "se este ano se comportar como os anos parecidos, a cota deve ficar entre a curva laranja
       e a azul, com a pontilhada como referência central". Chuvas fora do padrão histórico podem
       levar o rio para fora dessa faixa. Nos rios de vazante tardia (Paraguai), o mínimo real
       pode ocorrer depois de 31/dez, além do horizonte do gráfico.</p>
 
       <h3>Exportações</h3>
-      <p>O PDF do conjunto, a memória de cálculo (PDF) e o CSV são gerados na hora, refletindo
-      exatamente o que está na tela — incluindo o intervalo que você ajustou. A memória de
+      <p>O PDF do conjunto, a memória de cálculo (PDF) e o CSV são gerados na hora e
+      reproduzem o que está na tela, inclusive o intervalo que você ajustou. A memória de
       cálculo lista todos os anos candidatos com o motivo de cada inclusão ou exclusão, para
       auditoria completa.</p>
     </div>
   </dialog>
 
   <footer class="rodape">
-    <p>Metodologia: a partir do último dado do ano corrente (dia D), são selecionados os anos
-    históricos cuja cota no mesmo dia/mês está dentro do intervalo escolhido em torno da cota
-    atual (tolerância de ±3 dias quando falta o dado exato; exige-se ≥80% de cobertura entre D
-    e 31/dez e dado nos últimos 10 dias do ano). As trajetórias projetadas são as dos anos de
-    maior e menor queda até 31/dez e a média de todos os análogos, deslocadas para coincidir
-    com a cota atual no dia D; as curvas cinzas são as trajetórias deslocadas de todos os anos
-    análogos. O intervalo inicial de cada gráfico é o menor (≥50 cm) que contém pelo menos
-    3 anos análogos. Detalhes no botão "Como funciona?".
-    Os painéis de fundo lilás são séries sintéticas (profundidade disponível em passos críticos
-    do Tapajós, sem régua), calculadas das cotas de Itaituba e Santarém pelas equações do ábaco
-    réguas–calado da Marinha do Brasil — a fórmula consta em cada painel.
+    <p>Projeção por analogia com os anos de cota parecida no mesmo dia do calendário. Regras,
+    critério das curvas e figuras na <a href="metodologia.html" class="link-secundario">página de
+    metodologia</a>. Os painéis de fundo lilás são séries sintéticas (profundidade disponível em
+    passos críticos do Tapajós, sem régua), com a fórmula em cada painel.
     Fonte: data lake da ANA (banco HIDRO e telemetria); em PORTO MURTINHO, nos dias sem dado da ANA, régua da Marinha (CHN-6).</p>
   </footer>
 
   <script src="vendor/jspdf.umd.min.js"></script>
   <script src="vendor/jspdf.plugin.autotable.min.js"></script>
-  <script src="js/dados.js"></script>
-  <script src="js/analogia.js"></script>
-  <script src="js/grafico.js"></script>
-  <script src="js/exportar_pdf.js"></script>
-  <script src="js/principal.js"></script>
+  <script src="js/dados.js?v=4"></script>
+  <script src="js/analogia.js?v=4"></script>
+  <script src="js/grafico.js?v=4"></script>
+  <script src="js/exportar_pdf.js?v=4"></script>
+  <script src="js/principal.js?v=4"></script>
 </body>
 </html>
