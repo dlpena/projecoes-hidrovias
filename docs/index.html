@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Projeções de Nível — Estações-Chave para Hidrovias</title>
-  <link rel="stylesheet" href="css/estilo.css?v=3">
+  <link rel="stylesheet" href="css/estilo.css?v=4">
   <script src="vendor/plotly.min.js"></script>
 </head>
 <body>
@@ -36,7 +36,8 @@
     <div class="ajuda-corpo">
       <h3>A ideia em uma frase</h3>
       <p>Olhamos como o rio se comportou, <strong>em anos passados parecidos com o atual</strong>,
-      daqui até o fim do ano, e mostramos o caso mais baixo, o mais alto e o médio.</p>
+      daqui até o fim do horizonte escolhido, e mostramos o caso mais baixo, o mais alto e o
+      médio.</p>
 
       <h3>Passo a passo</h3>
       <ol>
@@ -49,8 +50,8 @@
         Por exemplo, ±10 cm quer dizer até 10 cm acima ou abaixo da cota atual. Esses são os
         <strong>anos análogos</strong> (listados abaixo de cada gráfico).</li>
         <li><strong>Ver o que aconteceu depois.</strong> Para cada ano análogo, pegamos a
-        trajetória da cota daquele dia até 31/dez e medimos a queda até o mínimo e a subida até o
-        máximo. Essas trajetórias aparecem em cinza-claro, deslocadas para começar exatamente na
+        trajetória da cota daquele dia até o fim do horizonte e medimos a queda até o mínimo e a
+        subida até o máximo. Essas trajetórias aparecem em cinza-claro, deslocadas para começar exatamente na
         cota atual, para que todas partam do mesmo ponto e fiquem comparáveis.</li>
         <li><strong>Descida ou subida.</strong> Pelas datas médias do mínimo e do máximo dos anos
         análogos, o painel decide se o conjunto ainda desce rumo ao mínimo ou já sobe rumo ao
@@ -67,6 +68,17 @@
       <p>A <a href="metodologia.html" class="link-secundario">página de metodologia</a> explica
       cada passo com figuras.</p>
 
+      <h3>O horizonte da projeção</h3>
+      <p>Por padrão, o gráfico mostra o ano civil (jan–dez) e a projeção vai até 31/dez. O
+      seletor <strong>Horizonte da projeção</strong>, em cada painel, permite projetar de 1 a 12
+      meses inteiros depois do mês do último dado; o mês do último dado não entra na conta. Nesse
+      caso, o gráfico mostra 12 meses inteiros a partir do dia 1: com horizonte de 6 meses,
+      aparecem 6 meses observados, o mês corrente até o último dado e 6 meses projetados. O botão
+      <strong>Voltar para jan–dez</strong> restaura o padrão. Quando o horizonte atravessa a virada
+      do ano, cada ano análogo continua no ano seguinte a ele. O ano análogo cujo ano seguinte
+      ainda não tem dados até o fim do horizonte sai do universo, com o motivo registrado na
+      memória de cálculo; por isso horizontes longos podem reduzir o número de anos análogos.</p>
+
       <h3>O Intervalo e por que ele importa</h3>
       <p>Intervalo pequeno = anos muito parecidos com o atual, porém poucos; intervalo grande =
       mais anos, porém menos parecidos. Cada gráfico abre com o menor intervalo (a partir de
@@ -80,7 +92,8 @@
         <li>Se um ano não tem medição exatamente naquele dia, usamos o dado mais próximo em até
         3 dias.</li>
         <li>Anos com muitas falhas depois do dia de referência ficam de fora: exigimos pelo
-        menos 80% dos dias com dado até 31/dez e alguma medição nos últimos 10 dias do ano.</li>
+        menos 80% dos dias com dado até o fim do horizonte e alguma medição nos últimos 10 dias
+        do horizonte.</li>
         <li>Cada dia usa a melhor fonte disponível: dado consistido do HIDRO &gt; dado bruto &gt;
         telemetria (a memória de cálculo mostra a cobertura de cada fonte).</li>
       </ul>
@@ -107,7 +120,7 @@
       "se este ano se comportar como os anos parecidos, a cota deve ficar entre a curva laranja
       e a azul, com a pontilhada como referência central". Chuvas fora do padrão histórico podem
       levar o rio para fora dessa faixa. Nos rios de vazante tardia (Paraguai), o mínimo real
-      pode ocorrer depois de 31/dez, além do horizonte do gráfico.</p>
+      pode ocorrer depois de 31/dez; um horizonte maior que o padrão mostra esse trecho.</p>
 
       <h3>Exportações</h3>
       <p>O PDF do conjunto, a memória de cálculo (PDF) e o CSV são gerados na hora e
@@ -127,10 +140,10 @@
 
   <script src="vendor/jspdf.umd.min.js"></script>
   <script src="vendor/jspdf.plugin.autotable.min.js"></script>
-  <script src="js/dados.js?v=4"></script>
-  <script src="js/analogia.js?v=4"></script>
-  <script src="js/grafico.js?v=4"></script>
-  <script src="js/exportar_pdf.js?v=4"></script>
-  <script src="js/principal.js?v=4"></script>
+  <script src="js/dados.js?v=6"></script>
+  <script src="js/analogia.js?v=6"></script>
+  <script src="js/grafico.js?v=6"></script>
+  <script src="js/exportar_pdf.js?v=6"></script>
+  <script src="js/principal.js?v=6"></script>
 </body>
 </html>

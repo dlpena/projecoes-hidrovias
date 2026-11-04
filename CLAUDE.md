@@ -33,15 +33,19 @@ irmãos) ficam em `CLAUDE.local.md`, não versionado.
   em produção (só os testes) — desde que as exportações passaram a ser geradas no navegador, o
   módulo Python existe só para garantir paridade de regras com o JS. Desde nov/2026 os dois
   arquivos são **idênticos byte a byte aos do painel Belo Monte** (`..\analogia-belo-monte`,
-  conferir com `cmp`), inclusive o horizonte em meses; aqui o site chama sempre o horizonte
-  padrão (até 31/dez), e `calcularNoAno` em `grafico.js` repõe as trajetórias (alinhadas a
-  `datas_proj`) nas 366 posições do ano usadas pelo restante do front-end.
+  conferir com `cmp`), inclusive o horizonte em meses.
+- **Horizonte da projeção** (nov/2026): seletor por painel, padrão jan–dez (projeção até 31/dez)
+  e botão "Voltar para jan–dez"; com N meses, o gráfico mostra 12 meses inteiros a partir do dia
+  1 e a projeção cobre N meses após o mês do último dado, atravessando o ano. `grafico.js` e
+  `exportar_pdf.js` trabalham com datas (`r.datas_proj`, `inicioJanela`, `linhasSerieDiaria`),
+  sem as 366 posições do ano; datas de toque nos pontos de controle levam o ano quando o
+  horizonte atravessa a virada.
 - **Curvas destacadas por regime dos análogos** (nov/2026): o regime é decidido pelo conjunto,
   pela data média (circular) do mínimo e do máximo de cada análogo no ciclo de 365 dias centrado
   em D. Próximo extremo médio = mínimo: descida (maior/menor queda); = máximo: subida
   (menor/maior subida), mesmo que alguns análogos ainda desçam. Critério único, sem estado de
   transição: o usuário rejeitou misturar maior queda com maior subida. O delta continua
-  individual, até 31/dez. Resultado em `regime`, `ciclo`, `ano_inferior/superior`,
+  individual, até o fim do horizonte. Resultado em `regime`, `ciclo`, `ano_inferior/superior`,
   `criterio_inferior/superior`, trajetórias `inferior/superior`. Avaliação retrospectiva
   (01/10 a 04/11/2026, 14 séries) feita antes da escolha; a regra troca de regime perto da data
   média do mínimo, sobretudo no Tapajós.

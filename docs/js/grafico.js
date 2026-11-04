@@ -19,59 +19,64 @@ const Grafico = (() => {
   const MESES = ["jan", "fev", "mar", "abr", "mai", "jun",
                  "jul", "ago", "set", "out", "nov", "dez"];
 
-  /** datas[i] = "YYYY-MM-DD" do índice i no ano dado (null p/ 29/fev inexistente). */
-  function datasDoAno(ano) {
-    const datas = new Array(366).fill(null);
-    for (let m = 1; m <= 12; m++) {
-      const nDias = new Date(ano, m, 0).getDate();
-      for (let d = 1; d <= nDias; d++) {
-        datas[Analogia.indiceDia(m, d)] =
-          `${ano}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-      }
+  // padrão: ano civil (gráfico jan–dez, projeção até 31/dez); o usuário pode escolher
+  // um horizonte de 1 a 12 meses inteiros após o mês do último dado e voltar ao padrão
+  const HORIZONTE_PADRAO = null;
+  const MESES_JANELA = 12;      // meses inteiros no gráfico, além do mês do último dado
+
+  // ---- datas em UTC, sem depender do fuso do navegador ----
+  const DIA_MS = 864e5;
+  const paraData = (iso) => {
+    const [y, m, d] = iso.split("-").map(Number);
+    return new Date(Date.UTC(y, m - 1, d));
+  };
+  const paraISO = (dt) => dt.toISOString().slice(0, 10);
+
+  /** Datas ISO de `ini` a `fim`, inclusive. */
+  function datasEntre(ini, fim) {
+    const out = [];
+    for (let t = paraData(ini), f = paraData(fim); t <= f; t = new Date(t.getTime() + DIA_MS)) {
+      out.push(paraISO(t));
     }
-    return datas;
+    return out;
   }
 
-  /**
-   * Calcula a analogia (horizonte padrão: até 31/dez) e devolve as trajetórias nas 366
-   * posições do ano corrente, formato usado por todo este módulo e pelo PDF. O algoritmo
-   * (analogia.js, idêntico ao do painel de Belo Monte) devolve as trajetórias alinhadas a
-   * r.datas_proj; aqui elas são reposicionadas pelo índice do dia no calendário.
-   */
-  function calcularNoAno(doc, range, modo) {
-    const r = Analogia.calcular(doc, range, modo, null);
-    if (!r.trajetorias) return r;
-    const idx = r.datas_proj.map((iso) =>
-      Analogia.indiceDia(Number(iso.slice(5, 7)), Number(iso.slice(8, 10))));
-    const para366 = (serie, vazio) => {
-      const out = new Array(366).fill(vazio);
-      idx.forEach((i, k) => { out[i] = serie[k]; });
-      return out;
-    };
-    const tj = r.trajetorias;
-    const todas = {};
-    for (const [ano, serie] of Object.entries(tj.todas)) todas[ano] = para366(serie, null);
-    r.trajetorias = {
-      inferior: para366(tj.inferior, null),
-      inferior_interp: para366(tj.inferior_interp, false),
-      superior: para366(tj.superior, null),
-      superior_interp: para366(tj.superior_interp, false),
-      media: para366(tj.media, null),
-      todas,
-    };
-    return r;
+  /** Valor da série integrada numa data ISO (null sem dado ou 29/fev inexistente). */
+  function valorEm(doc, iso) {
+    const y = Number(iso.slice(0, 4)), m = Number(iso.slice(5, 7)), d = Number(iso.slice(8, 10));
+    const serie = doc.anos[String(y)];
+    if (!serie || (m === 2 && d === 29 && !Analogia.bissexto(y))) return null;
+    const v = serie[Analogia.indiceDia(m, d)];
+    return v === null || v === undefined ? null : v;
   }
 
-  function traceAno(serie, datas, nome, cor, largura, visivelHover) {
-    const x = [], y = [];
-    for (let i = 0; i < 366; i++) {
-      if (datas[i] !== null) {
-        x.push(datas[i]);
-        y.push(serie[i] === undefined ? null : serie[i]);
-      }
-    }
+  const semHorizonte = (r) => r.horizonte_meses === null || r.horizonte_meses === undefined;
+
+  /** Início do gráfico: dia 1 do mês que deixa MESES_JANELA meses inteiros na tela
+   * (observados + projetados), sem contar o mês do último dado. Sem horizonte
+   * (padrão), 1º de janeiro do ano corrente. */
+  function inicioJanela(r) {
+    if (semHorizonte(r)) return `${r.ano_atual}-01-01`;
+    const y = Number(r.dia_d.slice(0, 4)), m = Number(r.dia_d.slice(5, 7));
+    return paraISO(new Date(Date.UTC(y, m - 1 - (MESES_JANELA - r.horizonte_meses), 1)));
+  }
+
+  /** Datas da janela inteira do gráfico (início do mês até o fim do horizonte). */
+  const datasJanela = (r) => datasEntre(inicioJanela(r), r.fim_horizonte);
+
+  const rotuloMes = (iso) => `${MESES[Number(iso.slice(5, 7)) - 1]}/${iso.slice(2, 4)}`;
+
+  /** "6 meses (até 31/05/2027)" ou, no padrão, "ano civil (até 31/12/2026)". */
+  function rotuloHorizonte(r) {
+    if (semHorizonte(r)) return `ano civil (até ${formatarDataBR(r.fim_horizonte)})`;
+    const h = r.horizonte_meses;
+    return `${h} ${h === 1 ? "mês" : "meses"} (até ${formatarDataBR(r.fim_horizonte)})`;
+  }
+
+  /** Linha a partir de x (datas ISO) e y alinhados. */
+  function traceSerie(x, y, nome, cor, largura, visivelHover) {
     return {
-      x, y, name: nome, mode: "lines",
+      x, y: y.map((v) => (v === undefined ? null : v)), name: nome, mode: "lines",
       line: { color: cor, width: largura },
       hoverinfo: visivelHover ? undefined : "skip",
       hovertemplate: visivelHover ? `${nome}: %{y:.0f} cm<extra></extra>` : undefined,
@@ -87,23 +92,23 @@ const Grafico = (() => {
     return v === null || v === undefined ? "" : v.toFixed(casas).replace(".", ",");
   }
 
-  /** Mínimo (valor, data) de uma trajetória a partir do dia D. */
-  function minimoTrajetoria(serie, datas, idxD) {
+  /** Mínimo (valor, data) de uma trajetória alinhada a r.datas_proj (de D ao fim do horizonte). */
+  function minimoTrajetoria(serie, datasProj) {
     let min = null, dataMin = null;
-    for (let i = idxD; i < 366; i++) {
-      if (datas[i] !== null && serie[i] !== null && serie[i] !== undefined) {
-        if (min === null || serie[i] < min) { min = serie[i]; dataMin = datas[i]; }
+    for (let k = 0; k < datasProj.length; k++) {
+      if (serie[k] !== null && serie[k] !== undefined) {
+        if (min === null || serie[k] < min) { min = serie[k]; dataMin = datasProj[k]; }
       }
     }
     return { min, dataMin };
   }
 
-  /** Máximo (valor, data) de uma trajetória a partir do dia D. */
-  function maximoTrajetoria(serie, datas, idxD) {
+  /** Máximo (valor, data) de uma trajetória alinhada a r.datas_proj. */
+  function maximoTrajetoria(serie, datasProj) {
     let max = null, dataMax = null;
-    for (let i = idxD; i < 366; i++) {
-      if (datas[i] !== null && serie[i] !== null && serie[i] !== undefined) {
-        if (max === null || serie[i] > max) { max = serie[i]; dataMax = datas[i]; }
+    for (let k = 0; k < datasProj.length; k++) {
+      if (serie[k] !== null && serie[k] !== undefined) {
+        if (max === null || serie[k] > max) { max = serie[k]; dataMax = datasProj[k]; }
       }
     }
     return { max, dataMax };
@@ -120,12 +125,12 @@ const Grafico = (() => {
   const tipoExtremo = (criterio) => (criterio.endsWith("subida") ? "max" : "min");
   const tipoExtremoMedia = (r) => (r.regime === "subida" ? "max" : "min");
 
-  function extremoTrajetoria(serie, datas, idxD, tipo) {
+  function extremoTrajetoria(serie, datasProj, tipo) {
     if (tipo === "max") {
-      const { max, dataMax } = maximoTrajetoria(serie, datas, idxD);
+      const { max, dataMax } = maximoTrajetoria(serie, datasProj);
       return { valor: max, data: dataMax };
     }
-    const { min, dataMin } = minimoTrajetoria(serie, datas, idxD);
+    const { min, dataMin } = minimoTrajetoria(serie, datasProj);
     return { valor: min, data: dataMin };
   }
 
@@ -164,29 +169,30 @@ const Grafico = (() => {
    * Toques da trajetória na cota `alvo` a partir do dia D (data interpolada linearmente
    * entre os dois dias vizinhos do cruzamento). `entrada` = primeiro cruzamento em queda,
    * `saida` = primeiro cruzamento em subida depois da entrada — se a trajetória já começa
-   * abaixo do alvo, só há saída. null quando o toque não ocorre até 31/dez.
+   * abaixo do alvo, só há saída. null quando o toque não ocorre até o fim do horizonte.
+   * `serie` alinhada a `datasProj` (r.datas_proj).
    */
-  function cruzamentosTrajetoria(serie, datas, idxD, alvo) {
+  function cruzamentosTrajetoria(serie, datasProj, alvo) {
     const toques = [];
     let anterior = null; // { data, valor }
-    for (let i = idxD; i < 366; i++) {
-      if (datas[i] === null || serie[i] === null || serie[i] === undefined) continue;
-      const valor = serie[i];
+    for (let k = 0; k < datasProj.length; k++) {
+      if (serie[k] === null || serie[k] === undefined) continue;
+      const valor = serie[k];
       if (anterior !== null && valor !== anterior.valor) {
         const a = anterior.valor - alvo, b = valor - alvo;
         if (a === 0 && (!toques.length || toques[toques.length - 1].data !== anterior.data)) {
           toques.push({ data: anterior.data, sentido: b < 0 ? "entrada" : "saida" });
         } else if ((a > 0 && b <= 0) || (a < 0 && b >= 0)) {
           const frac = a / (a - b);
-          const t0 = new Date(`${anterior.data}T00:00:00`).getTime();
-          const t1 = new Date(`${datas[i]}T00:00:00`).getTime();
+          const t0 = paraData(anterior.data).getTime();
+          const t1 = paraData(datasProj[k]).getTime();
           toques.push({
-            data: new Date(t0 + frac * (t1 - t0)).toISOString().slice(0, 10),
+            data: paraISO(new Date(t0 + frac * (t1 - t0))),
             sentido: a > 0 ? "entrada" : "saida",
           });
         }
       }
-      anterior = { data: datas[i], valor };
+      anterior = { data: datasProj[k], valor };
     }
     const iEntrada = toques.findIndex((t) => t.sentido === "entrada");
     const entrada = iEntrada >= 0 ? toques[iEntrada] : null;
@@ -246,15 +252,14 @@ const Grafico = (() => {
   function faixaY(doc, r) {
     let min = Infinity, max = -Infinity;
     const varre = (serie) => {
-      for (let i = 0; i < 366; i++) {
-        const v = serie[i];
+      for (const v of serie) {
         if (v !== null && v !== undefined) {
           if (v < min) min = v;
           if (v > max) max = v;
         }
       }
     };
-    varre(doc.anos[String(r.ano_atual)]);
+    varre(datasEntre(inicioJanela(r), r.dia_d).map((iso) => valorEm(doc, iso)));
     if (r.trajetorias) {
       Object.values(r.trajetorias.todas).forEach(varre);
       varre(r.trajetorias.inferior);
@@ -332,7 +337,7 @@ const Grafico = (() => {
    * superior ACIMA (curva mais alta), média no primeiro lado livre. As curvas de lado fixo
    * são posicionadas antes para a média se encaixar por último.
    */
-  function tracesCruzamentosControle(r, datas, pontos, amplitudeY, larguraGrafico, chipCor = CORES.chip) {
+  function tracesCruzamentosControle(r, pontos, amplitudeY, larguraGrafico, chipCor = CORES.chip) {
     const traces = [];
     const anotacoes = [];
     const tj = r.trajetorias;
@@ -344,7 +349,7 @@ const Grafico = (() => {
     for (const alvo of [pontos.pc1, pontos.pc2]) {
       if (alvo === null || alvo === undefined || !isFinite(alvo)) continue;
       for (const [serie, cor, curva] of curvas) {
-        const { entrada, saida } = cruzamentosTrajetoria(serie, datas, r.idx_d, alvo);
+        const { entrada, saida } = cruzamentosTrajetoria(serie, r.datas_proj, alvo);
         if (entrada) toques.push({ x: entrada.data, y: alvo, cor, curva, sentido: "entrada" });
         if (saida) toques.push({ x: saida.data, y: alvo, cor, curva, sentido: "saida" });
       }
@@ -353,14 +358,16 @@ const Grafico = (() => {
     toques.sort((a, b) =>
       (a.curva === "media") - (b.curva === "media") || new Date(a.x) - new Date(b.x));
     // Anticolisão em pixels estimados nos dois eixos: px/dia sai da largura do plot (margens
-    // l=58 e r=70 descontadas) e px/cm da altura útil (~396px) sobre a amplitude com a folga
-    // do autorange (~6% por lado). Cada rótulo (~36x17px com o chip) pega o menor nível livre
-    // no seu lado, afastando-se da linha 19px por nível (+1 = abaixo na tela, -1 = acima).
-    const pxDia = Math.max(1.5, ((larguraGrafico || 1100) - 128) / 366);
+    // l=58 e r=70 descontadas) sobre os dias da janela, e px/cm da altura útil (~396px) sobre
+    // a amplitude com a folga do autorange (~6% por lado). Cada rótulo (~36x17px com o chip)
+    // pega o menor nível livre no seu lado, afastando-se da linha 19px por nível (+1 = abaixo
+    // na tela, -1 = acima).
+    const ini = paraData(inicioJanela(r)).getTime();
+    const nDias = (paraData(r.fim_horizonte).getTime() - ini) / DIA_MS + 1;
+    const pxDia = Math.max(1.5, ((larguraGrafico || 1100) - 128) / nDias);
     const pxCm = 396 / (amplitudeY * 1.12);
-    const diaAno = (iso) =>
-      (new Date(`${iso}T00:00:00`) - new Date(`${r.ano_atual}-01-01T00:00:00`)) / 864e5;
-    const cx = toques.map((p) => diaAno(p.x) * pxDia);
+    const diaJanela = (iso) => (paraData(iso).getTime() - ini) / DIA_MS;
+    const cx = toques.map((p) => diaJanela(p.x) * pxDia);
     const LADO_FIXO = { inferior: 1, superior: -1 };
     const pos = toques.map(() => null); // { dir, nivel } depois de posicionado
     const sRotulo = (y, dir, n) => -y * pxCm + dir * (20 + n * 19);
@@ -392,14 +399,14 @@ const Grafico = (() => {
   }
 
   function montarTraces(doc, r, pontos, larguraGrafico) {
-    const datas = datasDoAno(r.ano_atual);
+    const datasProj = r.datas_proj;
     const traces = [];
     const anotacoesRotulos = [];
 
     // trajetórias deslocadas dos anos análogos, apenas após o dia D (fundo)
     if (r.trajetorias) {
       for (const [ano, serie] of Object.entries(r.trajetorias.todas)) {
-        const t = traceAno(serie, datas, ano, CORES.anoAnalogo, 1, true);
+        const t = traceSerie(datasProj, serie, ano, CORES.anoAnalogo, 1, true);
         t.hovertemplate = `${ano} (análogo): %{y:.0f} cm<extra></extra>`;
         traces.push(t);
       }
@@ -410,15 +417,18 @@ const Grafico = (() => {
         [tj.media, `Média (${r.selecionados.length} anos)`, CORES.media, "dot"],
       ];
       for (const [serie, nome, cor, traco] of proj) {
-        const t = traceAno(serie, datas, nome, cor, 2, true);
+        const t = traceSerie(datasProj, serie, nome, cor, 2, true);
         t.line.dash = traco;
         t.showlegend = true;
         traces.push(t);
       }
     }
 
-    const tObs = traceAno(doc.anos[String(r.ano_atual)], datas,
-                          `Observado ${r.ano_atual}`, CORES.observado, 2.5, true);
+    // observado: do início da janela (pode estar no ano anterior) até o último dado
+    const datasObs = datasEntre(inicioJanela(r), r.dia_d);
+    const tObs = traceSerie(datasObs, datasObs.map((iso) => valorEm(doc, iso)),
+                            semHorizonte(r) ? `Observado ${r.ano_atual}` : "Observado",
+                            CORES.observado, 2.5, true);
     tObs.showlegend = true;
     traces.push(tObs);
 
@@ -434,7 +444,7 @@ const Grafico = (() => {
         ...curvasExtremas(r).map((c) => [c.serie, c.cor, c.tipo]),
         [tj.media, CORES.media, tipoExtremoMedia(r)],
       ]) {
-        const { valor, data } = extremoTrajetoria(serie, datas, r.idx_d, tipo);
+        const { valor, data } = extremoTrajetoria(serie, datasProj, tipo);
         if (valor !== null) minimos.push({ x: data, y: valor, cor, tipo });
       }
       const deslocamentos = posicionarRotulos(minimos, amplitudeY);
@@ -444,12 +454,12 @@ const Grafico = (() => {
       });
 
       const { traces: tracesCruz, anotacoes: anotacoesCruz } =
-        tracesCruzamentosControle(r, datas, pontos || {}, amplitudeY, larguraGrafico,
+        tracesCruzamentosControle(r, pontos || {}, amplitudeY, larguraGrafico,
                                   doc.sintetica ? CORES.chipSintetica : CORES.chip);
       traces.push(...tracesCruz);
       anotacoesRotulos.push(...anotacoesCruz);
     }
-    return { traces, datas, anotacoesRotulos };
+    return { traces, anotacoesRotulos };
   }
 
   /** Linhas horizontais e rótulos dos pontos de controle (cotas de referência definidas pelo usuário). */
@@ -486,14 +496,18 @@ const Grafico = (() => {
       plot_bgcolor: "rgba(0,0,0,0)",
       font: { family: "Segoe UI, system-ui, sans-serif", size: 12, color: "#555" },
       dragmode: false,   // sem zoom/pan por clique-e-arraste
-      xaxis: {
-        fixedrange: true,
-        tickvals: MESES.map((_, m) => `${r.ano_atual}-${String(m + 1).padStart(2, "0")}-01`),
-        ticktext: MESES,
-        hoverformat: "%d/%m",
-        gridcolor: "#efefec",
-        range: [`${r.ano_atual}-01-01`, `${r.ano_atual}-12-31`],
-      },
+      xaxis: (() => {
+        const ticks = datasJanela(r).filter((iso) => iso.endsWith("-01"));
+        return {
+          fixedrange: true,
+          tickvals: ticks,
+          ticktext: semHorizonte(r) ? ticks.map((iso) => MESES[Number(iso.slice(5, 7)) - 1])
+                                    : ticks.map(rotuloMes),
+          hoverformat: semHorizonte(r) ? "%d/%m" : "%d/%m/%Y",
+          gridcolor: "#efefec",
+          range: [inicioJanela(r), r.fim_horizonte],
+        };
+      })(),
       yaxis: {
         fixedrange: true,
         title: { text: `${doc.grandeza || "Cota"} (${doc.unidade || "cm"})`, font: { size: 12 } },
@@ -543,7 +557,7 @@ const Grafico = (() => {
     L.push(`Dados atualizados em;${formatarDataBR(doc.ultima_data)};fonte do último dado;${doc.fonte_ultimo_dado}`);
     L.push(`Dia D;${formatarDataBR(r.dia_d)};${g} atual (cm);${numeroBR(r.cota_atual, 0)}`);
     L.push(`Intervalo (${gMin} atual ±);${numeroBR(r.range_valor)} ${r.modo === "cm" ? "cm" : "%"};equivalente em cm;±${numeroBR(r.limite_cm)}`);
-    const datasCSV = datasDoAno(r.ano_atual);
+    L.push(`Horizonte da projeção;${rotuloHorizonte(r)}`);
     for (const [n, pc] of [["1", r.pc1], ["2", r.pc2]]) {
       if (pc === null || pc === undefined) continue;
       L.push(`Ponto de controle ${n} (cm);${numeroBR(pc, 0)}`);
@@ -552,14 +566,14 @@ const Grafico = (() => {
           ...curvasExtremas(r).map((c) => [c.criterio, c.serie]),
           ["media", r.trajetorias.media],
         ]) {
-          const { entrada, saida } = cruzamentosTrajetoria(serie, datasCSV, r.idx_d, pc);
+          const { entrada, saida } = cruzamentosTrajetoria(serie, r.datas_proj, pc);
           L.push([`Toques no ponto de controle ${n} (${nome})`,
                   "entrada", entrada ? formatarDataBR(entrada.data) : "não atinge",
                   "saída", saida ? formatarDataBR(saida.data) : "—"].join(";"));
         }
       }
     }
-    L.push(`Regras;tolerância ±3 dias no dia D;cobertura pós-D ≥80% e dado nos últimos 10 dias do ano`);
+    L.push(`Regras;tolerância ±3 dias no dia D;cobertura de D ao fim do horizonte ≥80% e dado nos últimos 10 dias do horizonte`);
     if (r.regime) L.push(`Regime;${textoRegime(r)}`);
     if (s) {
       L.push(`Metodologia (série sintética);${s.formula_texto};publicada em cm inteiros (profundidade × 100)`);
@@ -589,27 +603,41 @@ const Grafico = (() => {
     }
     L.push("dia_do_minimo_do_ciclo e dia_do_maximo_do_ciclo: dias em relação a D (negativo = antes de D) no ciclo de 365 dias centrado em D");
     L.push("");
-    L.push("BLOCO 2 — Séries do gráfico (dia a dia do ano corrente)");
+    L.push(`BLOCO 2 — Séries do gráfico (dia a dia, ${formatarDataBR(inicioJanela(r))} a ${formatarDataBR(r.fim_horizonte)})`);
     L.push(`data;observado_cm;proj_${r.criterio_inferior || "inferior"}_cm;` +
            `proj_${r.criterio_superior || "superior"}_cm;proj_media_cm;interpolado`);
-    const datas = datasCSV;
-    const obs = doc.anos[String(r.ano_atual)];
-    const tj = r.trajetorias;
-    for (let i = 0; i < 366; i++) {
-      if (datas[i] === null) continue;
-      const temProj = tj && i >= r.idx_d;
-      const interp = temProj && (tj.inferior_interp[i] || tj.superior_interp[i]);
+    for (const l of linhasSerieDiaria(doc, r)) {
       const linha = [
-        formatarDataBR(datas[i]),
-        obs[i] === null || obs[i] === undefined ? "" : numeroBR(obs[i], 0),
-        temProj ? numeroBR(tj.inferior[i]) : "",
-        temProj ? numeroBR(tj.superior[i]) : "",
-        temProj ? numeroBR(tj.media[i]) : "",
-        temProj && interp ? "sim" : "",
+        formatarDataBR(l.data),
+        l.obs === null ? "" : numeroBR(l.obs, 0),
+        l.temProj ? numeroBR(l.inferior) : "",
+        l.temProj ? numeroBR(l.superior) : "",
+        l.temProj ? numeroBR(l.media) : "",
+        l.interp ? "sim" : "",
       ];
       if (linha.slice(1).some((v) => v !== "")) L.push(linha.join(";"));
     }
     return L.join("\r\n");
+  }
+
+  /** Linhas dia a dia da janela do gráfico (usadas no CSV e na memória em PDF). */
+  function linhasSerieDiaria(doc, r) {
+    const tj = r.trajetorias;
+    const k0 = new Map(r.datas_proj.map((iso, k) => [iso, k]));
+    return datasJanela(r).map((iso) => {
+      const k = k0.has(iso) ? k0.get(iso) : null;
+      const temProj = !!tj && k !== null;
+      const val = (serie) => (serie[k] === undefined ? null : serie[k]);
+      return {
+        data: iso,
+        obs: iso <= r.dia_d ? valorEm(doc, iso) : null,
+        temProj,
+        inferior: temProj ? val(tj.inferior) : null,
+        superior: temProj ? val(tj.superior) : null,
+        media: temProj ? val(tj.media) : null,
+        interp: temProj && (tj.inferior_interp[k] || tj.superior_interp[k]),
+      };
+    });
   }
 
   function baixarCSV(nomeArquivo, conteudo) {
@@ -661,6 +689,18 @@ const Grafico = (() => {
         </span>
       </div>
       <div class="controles-referencia">
+        <label title="Padrão: ano civil (gráfico jan–dez, projeção até 31/dez). Ao escolher N meses, a projeção cobre N meses inteiros após o mês do último dado e o gráfico mostra 12 meses inteiros: os demais são os meses observados mais recentes.">
+          Horizonte da projeção
+          <select class="ctl-horizonte">
+            <option value="" selected>jan–dez (padrão)</option>
+            ${Array.from({ length: 12 }, (_, i) => i + 1).map((h) =>
+              `<option value="${h}">${h} ${h === 1 ? "mês" : "meses"}</option>`).join("")}
+          </select>
+          <span class="ctl-fim-horizonte"></span></label>
+        <button type="button" class="botao-padrao" disabled
+                title="Volta o gráfico para o ano civil (jan–dez), com a projeção até 31/dez">Voltar para jan–dez</button>
+      </div>
+      <div class="controles-referencia">
         <label title="Linha horizontal de referência desenhada no gráfico (ex.: ${gMin} mínima navegável).">
           ${g} do Ponto de controle 1
           <input type="number" step="1" class="ctl-pc1" placeholder="cm">
@@ -698,31 +738,39 @@ const Grafico = (() => {
       pc2: sec.querySelector(".ctl-pc2"),
       pc1Datas: sec.querySelector(".ctl-pc1-datas"),
       pc2Datas: sec.querySelector(".ctl-pc2-datas"),
+      horizonte: sec.querySelector(".ctl-horizonte"),
+      fimHorizonte: sec.querySelector(".ctl-fim-horizonte"),
+      botaoPadrao: sec.querySelector(".botao-padrao"),
     };
-    // intervalo inicial: o menor (≥50 cm) que contém pelo menos 3 anos análogos
-    const rangeAuto = Analogia.rangeInicial(doc);
+    // intervalo inicial: o menor (≥50 cm) que contém pelo menos 3 anos análogos, calculado
+    // no padrão jan–dez (ao trocar o horizonte, o intervalo é mantido)
+    const rangeAuto = Analogia.rangeInicial(doc, Analogia.MIN_ANALOGOS, 50.0, HORIZONTE_PADRAO);
     const estado = { range: rangeAuto, modo: "cm", resultado: null,
-                     pc1: null, pc2: null, cruz1: true, cruz2: true };
+                     pc1: null, pc2: null, cruz1: true, cruz2: true, horizonte: HORIZONTE_PADRAO };
+    const calcularAtual = () => Analogia.calcular(doc, estado.range, estado.modo, estado.horizonte);
     if (rangeAuto > 500) el.slider.max = String(Math.ceil(rangeAuto * 2));
     el.slider.value = String(rangeAuto);
     el.num.value = String(rangeAuto);
 
     /** Texto-resumo de quando cada projeção cruza os pontos de controle definidos. */
-    function textoCruzamentos(r, datas, pontos) {
+    function textoCruzamentos(r, pontos) {
       if (!r.trajetorias) return "";
       const curvas = [
         ...curvasExtremas(r).map((c) => [c.nome.toLowerCase(), c.serie]),
         ["média", r.trajetorias.media],
       ];
       const linhas = [];
+      // horizonte que atravessa o ano: a data leva o ano, para não ficar ambígua
+      const cruzaAno = r.fim_horizonte.slice(0, 4) !== r.dia_d.slice(0, 4);
+      const dataToque = (iso) => (cruzaAno ? formatarDataBR(iso) : formatarDataBR(iso).slice(0, 5));
       for (const [n, alvo] of [["1", pontos.pc1], ["2", pontos.pc2]]) {
         if (alvo === null || alvo === undefined || !isFinite(alvo)) continue;
         const partes = curvas.map(([nome, serie]) => {
-          const { entrada, saida } = cruzamentosTrajetoria(serie, datas, r.idx_d, alvo);
+          const { entrada, saida } = cruzamentosTrajetoria(serie, r.datas_proj, alvo);
           if (!entrada && !saida) return `${nome} não atinge`;
           const seg = [];
-          if (entrada) seg.push(`entra em ${formatarDataBR(entrada.data).slice(0, 5)}`);
-          if (saida) seg.push(`sai em ${formatarDataBR(saida.data).slice(0, 5)}`);
+          if (entrada) seg.push(`entra em ${dataToque(entrada.data)}`);
+          if (saida) seg.push(`sai em ${dataToque(saida.data)}`);
           return `${nome} ${seg.join(" e ")}`;
         });
         linhas.push(`Ponto de controle ${n} (${numeroBR(alvo, 0)} cm): ${partes.join(" · ")}.`);
@@ -731,23 +779,24 @@ const Grafico = (() => {
     }
 
     function render() {
-      const r = calcularNoAno(doc, estado.range, estado.modo);
+      const r = calcularAtual();
       estado.resultado = r;
       const pontos = { pc1: estado.pc1, pc2: estado.pc2 };
       // no gráfico, só entram os toques dos PCs com o checkbox "datas" marcado
       const pontosCruz = { pc1: estado.cruz1 ? estado.pc1 : null,
                            pc2: estado.cruz2 ? estado.pc2 : null };
-      const { traces, datas, anotacoesRotulos } = montarTraces(doc, r, pontosCruz, el.grafico.clientWidth);
+      const { traces, anotacoesRotulos } = montarTraces(doc, r, pontosCruz, el.grafico.clientWidth);
       const layout = layoutBase(doc, r, pontos);
       layout.annotations = layout.annotations.concat(anotacoesRotulos);
       Plotly.react(el.grafico, traces, layout, CONFIG);
       el.contagem.textContent = String(r.selecionados.length);
+      el.fimHorizonte.textContent = `até ${formatarDataBR(r.fim_horizonte)}`;
       el.aviso.textContent = r.aviso || "";
       el.regime.textContent = textoRegime(r);
       el.rodape.textContent = r.selecionados.length
         ? `Anos análogos (${gMin} em ${formatarDataBR(r.dia_d).slice(0, 5)} dentro de ±${numeroBR(r.limite_cm)} cm da atual): ${r.selecionados.join(", ")}.`
         : "";
-      el.cruzamentos.textContent = textoCruzamentos(r, datas, pontos);
+      el.cruzamentos.textContent = textoCruzamentos(r, pontos);
     }
 
     let timer = null;
@@ -771,7 +820,7 @@ const Grafico = (() => {
     function trocarModo(modo) {
       if (modo === estado.modo) return;
       // mantém o range equivalente ao trocar de unidade (cm <-> % da cota atual)
-      const r = estado.resultado || calcularNoAno(doc, estado.range, estado.modo);
+      const r = estado.resultado || calcularAtual();
       const cota = Math.abs(r.cota_atual) || 1;
       const novo = modo === "pct"
         ? Math.round((estado.range / cota) * 1000) / 10   // cm -> %, 1 casa decimal
@@ -813,8 +862,17 @@ const Grafico = (() => {
       agendarRender();
     });
 
+    function definirHorizonte(valor) {
+      estado.horizonte = valor === "" || valor === null ? null : Number(valor);
+      el.horizonte.value = estado.horizonte === null ? "" : String(estado.horizonte);
+      el.botaoPadrao.disabled = estado.horizonte === null;
+      render();
+    }
+    el.horizonte.addEventListener("change", () => definirHorizonte(el.horizonte.value));
+    el.botaoPadrao.addEventListener("click", () => definirHorizonte(null));
+
     function resultadoComPontosControle() {
-      const r = estado.resultado || calcularNoAno(doc, estado.range, estado.modo);
+      const r = estado.resultado || calcularAtual();
       return { ...r, pc1: estado.pc1, pc2: estado.pc2 };
     }
     sec.querySelector(".botao-memoria").addEventListener("click", () => {
@@ -822,20 +880,22 @@ const Grafico = (() => {
     });
     el.csv.addEventListener("click", () => {
       const r = resultadoComPontosControle();
-      baixarCSV(`analogia_${doc.slug}_${doc.ultima_data}.csv`, gerarCSV(doc, r));
+      const sufixo = estado.horizonte === null ? "" : `_${estado.horizonte}m`;
+      baixarCSV(`analogia_${doc.slug}_${doc.ultima_data}${sufixo}.csv`, gerarCSV(doc, r));
     });
 
     REGISTRO.set(doc.slug, {
       doc,
       grafico: el.grafico,
       get resultado() {
-        return estado.resultado || calcularNoAno(doc, estado.range, estado.modo);
+        return estado.resultado || calcularAtual();
       },
     });
 
     render();
   }
 
-  return { montarSecao, datasDoAno, minimoTrajetoria, maximoTrajetoria, cruzamentosTrajetoria,
-           curvasExtremas, textoRegime, NOME_CRITERIO, registro: REGISTRO };
+  return { montarSecao, minimoTrajetoria, maximoTrajetoria, cruzamentosTrajetoria,
+           curvasExtremas, textoRegime, NOME_CRITERIO, linhasSerieDiaria, rotuloHorizonte,
+           inicioJanela, registro: REGISTRO };
 })();

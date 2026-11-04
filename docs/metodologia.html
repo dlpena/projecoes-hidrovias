@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Metodologia — Estações-Chave para Hidrovias</title>
-  <link rel="stylesheet" href="css/estilo.css?v=3">
+  <link rel="stylesheet" href="css/estilo.css?v=4">
 </head>
 <body>
   <header class="topo">
@@ -29,6 +29,7 @@
         <li><a href="#trajetorias">Trajetórias deslocadas</a></li>
         <li><a href="#regime">Regime dos análogos: descida ou subida</a></li>
         <li><a href="#curvas">Curvas destacadas</a></li>
+        <li><a href="#horizonte">Horizonte da projeção</a></li>
         <li><a href="#leitura">Como ler e limites</a></li>
         <li><a href="#dados">Dados</a></li>
         <li><a href="#sinteticas">Séries sintéticas do Tapajós</a></li>
@@ -37,14 +38,16 @@
     </div>
 
     <h2 id="ideia">1. A ideia</h2>
-    <p>A projeção responde a uma pergunta: se o rio se comportar daqui até o fim do ano como se
+    <p>A projeção responde a uma pergunta: se o rio se comportar daqui até o fim do horizonte como se
     comportou em anos passados que, nesta mesma data, estavam com cota parecida com a atual, que
     trajetórias são plausíveis? O painel não usa modelo de chuva nem previsão meteorológica. Ele
     usa apenas o histórico da própria estação.</p>
     <p>O último dia com dado do ano corrente é chamado de <strong>dia D</strong>, e a cota nesse dia
-    é a <strong>cota atual</strong>. A projeção vai de D até 31 de dezembro.</p>
+    é a <strong>cota atual</strong>. Por padrão, a projeção vai de D até 31 de dezembro (seção
+    6).</p>
     <p>As figuras desta página usam dados reais de Itaituba. Em cada exemplo, a série de 2026 foi
-    cortada no dia D indicado, para mostrar o painel como ele estava naquele dia. As figuras são
+    cortada no dia D indicado, para mostrar o painel como ele estava naquele dia, com a projeção
+    até 31/dez. As figuras são
     geradas pelo script <code>ferramentas/figuras_metodologia.py</code>, que usa o mesmo algoritmo
     do painel.</p>
 
@@ -56,8 +59,8 @@
     <ul>
       <li>Se o ano não tem dado exatamente no dia D, vale o dado mais próximo em até 3 dias, com
       preferência para o dia anterior em caso de empate. Sem dado nessa janela, o ano fica de fora.</li>
-      <li>O ano também fica de fora se tiver menos de 80% dos dias com dado entre D e 31/dez, ou se
-      não tiver nenhum dado nos últimos 10 dias do ano.</li>
+      <li>O ano também fica de fora se tiver menos de 80% dos dias com dado entre D e o fim do
+      horizonte, ou se não tiver nenhum dado nos últimos 10 dias do horizonte.</li>
       <li>Com menos de três análogos, o painel mostra um aviso. Sem nenhum, não há projeção.</li>
     </ul>
     <figure>
@@ -68,15 +71,16 @@
     </figure>
 
     <h2 id="trajetorias">3. Trajetórias deslocadas</h2>
-    <p>De cada ano análogo, o painel toma a série de D até 31/dez e a desloca na vertical para que
+    <p>De cada ano análogo, o painel toma a série de D até o fim do horizonte e a desloca na
+    vertical para que
     ela comece exatamente na cota atual. Assim, todas as trajetórias partem do mesmo ponto e passam
     a mostrar variações em relação a hoje. Lacunas internas de cada trajetória são preenchidas por
     interpolação linear e ficam marcadas no CSV e na memória de cálculo. A <strong>média</strong> é
     a média dia a dia das trajetórias deslocadas de todos os análogos.</p>
-    <p>Para cada análogo, o painel mede duas grandezas até 31/dez:</p>
+    <p>Para cada análogo, o painel mede duas grandezas até o fim do horizonte:</p>
     <ul>
-      <li><strong>queda</strong>: cota em D menos o mínimo até 31/dez;</li>
-      <li><strong>subida</strong>: máximo até 31/dez menos a cota em D.</li>
+      <li><strong>queda</strong>: cota em D menos o mínimo no horizonte;</li>
+      <li><strong>subida</strong>: máximo no horizonte menos a cota em D.</li>
     </ul>
     <figure>
       <a href="img/metodologia/trajetorias.png" title="Abrir a figura em tamanho cheio"><img src="img/metodologia/trajetorias.png" alt="Trajetórias deslocadas dos anos análogos de Itaituba a partir de 1º de outubro de 2026"></a>
@@ -126,7 +130,7 @@
     <p>Na descida, cada curva tem o mínimo marcado com o valor; na subida, o máximo. A média segue o
     regime. Em empate na queda, decide a subida (a maior queda fica com o ano de menor subida); em
     empate na subida, decide a queda. Persistindo o empate, vale o ano mais antigo. A legenda mostra
-    o ano de cada curva e a queda ou subida dele até 31/dez.</p>
+    o ano de cada curva e a queda ou subida dele no horizonte.</p>
     <figure>
       <a href="img/metodologia/regimes.png" title="Abrir a figura em tamanho cheio"><img src="img/metodologia/regimes.png" alt="Curvas destacadas de Itaituba em 1º de outubro (descida) e em 4 de novembro de 2026 (subida)"></a>
       <figcaption>Figura 4. Itaituba em dois dias de 2026. À esquerda, D = 01/10, ainda antes da
@@ -135,7 +139,21 @@
       curvas de menor e maior subida.</figcaption>
     </figure>
 
-    <h2 id="leitura">6. Como ler e limites</h2>
+    <h2 id="horizonte">6. Horizonte da projeção</h2>
+    <p>Por padrão, o gráfico mostra o ano civil (jan–dez) e a projeção vai até 31/dez. O seletor
+    <strong>Horizonte da projeção</strong>, em cada painel, permite projetar de 1 a 12 meses
+    inteiros depois do mês do último dado; o mês do último dado não entra na conta. Nesse caso, o
+    gráfico mostra 12 meses inteiros a partir do dia 1: com horizonte de 6 meses, aparecem 6 meses
+    observados, o mês corrente até o último dado e 6 meses projetados. O botão <strong>Voltar para
+    jan–dez</strong> restaura o padrão.</p>
+    <p>Quando o horizonte atravessa a virada do ano, cada ano análogo continua no ano seguinte a ele.
+    O análogo cujo ano seguinte ainda não tem dados até o fim do horizonte sai do universo, com o
+    motivo registrado na memória de cálculo. Por isso horizontes longos podem reduzir o número de
+    anos análogos. A queda e a subida de cada análogo, a cobertura exigida e as datas de toque nos
+    pontos de controle passam a valer até o fim do horizonte escolhido. O regime não depende do
+    horizonte, porque o ciclo examinado é sempre o de 365 dias em torno de D.</p>
+
+    <h2 id="leitura">7. Como ler e limites</h2>
     <ul>
       <li>A projeção diz o que aconteceria se este ano repetisse o comportamento dos anos parecidos.
       Chuva fora do padrão histórico pode levar o rio para fora da faixa entre as curvas
@@ -147,12 +165,12 @@
       <li>Perto da data média do mínimo, o regime pode trocar de um dia para o outro, porque o
       conjunto de análogos muda com a cota.</li>
       <li>Nos rios de vazante tardia, como o Paraguai, o mínimo real pode ocorrer depois de 31/dez,
-      fora do horizonte do gráfico.</li>
+      fora do horizonte padrão. Um horizonte maior mostra esse trecho.</li>
       <li>O Intervalo controla o equilíbrio entre semelhança e quantidade: Intervalo pequeno reúne
       anos mais parecidos, porém poucos. Ajustá-lo mostra a sensibilidade da projeção.</li>
     </ul>
 
-    <h2 id="dados">7. Dados</h2>
+    <h2 id="dados">8. Dados</h2>
     <ul>
       <li>As cotas estão em cm e vêm do data lake da ANA. Cada dia usa a melhor fonte disponível:
       dado consistido do HIDRO, depois dado bruto, depois telemetria. A memória de cálculo mostra a
@@ -165,7 +183,7 @@
       UHE Jirau) e Humaitá a partir de 1968 (série antiga em outra referência de nível).</li>
     </ul>
 
-    <h2 id="sinteticas">8. Séries sintéticas do Tapajós</h2>
+    <h2 id="sinteticas">9. Séries sintéticas do Tapajós</h2>
     <p>Os painéis de fundo lilás (Lago do Roque, Monte Cristo e Itapaiunas) são passos críticos de
     navegação entre Itaituba e Santarém, sem régua própria. A série mostrada é a profundidade
     disponível no passo, calculada dia a dia pelas equações do ábaco réguas–calado da Marinha do
@@ -179,13 +197,13 @@
     Valores iguais ou menores que zero indicam passo acima do nível d'água. A projeção por analogia
     funciona do mesmo modo sobre a série de profundidade.</p>
 
-    <h2 id="controle">9. Pontos de controle e exportações</h2>
+    <h2 id="controle">10. Pontos de controle e exportações</h2>
     <p>Os pontos de controle são cotas de referência que o usuário digita no painel, como a cota
     mínima navegável. O gráfico marca as datas em que cada curva destacada e a média cruzam essa
     cota descendo (entrada) e subindo de volta (saída), com interpolação linear entre os dias
     vizinhos.</p>
     <p>O PDF do conjunto, a memória de cálculo em PDF e o CSV são gerados no navegador com o
-    Intervalo ajustado na tela. A memória de cálculo lista todos os anos candidatos com o motivo de
+    Intervalo e o horizonte ajustados na tela. A memória de cálculo lista todos os anos candidatos com o motivo de
     inclusão ou exclusão, a queda e a subida de cada um e os dias do mínimo e do máximo do ciclo
     usados na decisão do regime.</p>
   </main>

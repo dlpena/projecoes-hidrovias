@@ -110,6 +110,7 @@ const ExportarPDF = (() => {
              MARGEM, y);
     y += 8;
 
+    const brData = (iso) => iso.split("-").reverse().join("/");
     y = tituloSecao(pdf, sec("Parâmetros"), y);
     const dataD = r.dia_d.split("-").reverse().join("/");
     const linhasParametros = [
@@ -117,6 +118,8 @@ const ExportarPDF = (() => {
        `${g} atual`, `${fmt(r.cota_atual, 0)} cm`],
       [`Intervalo (${gMin} atual ±)`, t(`${rotuloRange(r)} — o ajustado na tela (equivale a ±${fmt(r.limite_cm)} cm)`),
        "Anos análogos", String(r.selecionados.length)],
+      ["Horizonte da projeção", t(Grafico.rotuloHorizonte(r)),
+       "Janela do gráfico", t(`${brData(Grafico.inicioJanela(r))} a ${brData(r.fim_horizonte)}`)],
     ];
     const temPc1 = r.pc1 !== null && r.pc1 !== undefined;
     const temPc2 = r.pc2 !== null && r.pc2 !== undefined;
@@ -135,8 +138,10 @@ const ExportarPDF = (() => {
     y = nota(pdf,
       `Regras: ${gMin} do candidato no dia D com tolerância de ±3 dias (mais próximo primeiro; ` +
       `empate favorece o dia anterior); seleção se |${gMin} − ${gMin} atual| ≤ intervalo; exige-se ≥80% ` +
-      `de cobertura entre D e 31/dez e dado nos últimos 10 dias do ano; delta de queda = ${gMin} ` +
-      `em D − mínimo pós-D; delta de subida = máximo pós-D − ${gMin} em D; regime dos análogos ` +
+      "de cobertura entre D e o fim do horizonte e dado nos últimos 10 dias do horizonte (quando o " +
+      "horizonte entra no ano seguinte, o análogo usa os dados do ano seguinte ao seu); delta de " +
+      `queda = ${gMin} em D − mínimo no horizonte; delta de subida = máximo no horizonte − ${gMin} ` +
+      "em D; regime dos análogos " +
       "pela data média (circular) do mínimo e do máximo de cada análogo no ciclo de 365 dias " +
       "centrado em D: descida se o próximo extremo médio é o mínimo, subida se é o máximo; " +
       "curvas: descida, maior e menor queda; subida, menor e maior subida; " +
@@ -219,15 +224,14 @@ const ExportarPDF = (() => {
     y = tituloSecao(pdf, sec("Projeções resultantes"), y);
     const tj = r.trajetorias;
     if (tj) {
-      const datas = Grafico.datasDoAno(r.ano_atual);
       const linhas = [];
       const brD = (iso) => (iso ? iso.split("-").reverse().join("/") : "");
       for (const [nome, serie, ano] of [
         ...Grafico.curvasExtremas(r).map((c) => [c.nome, c.serie, String(c.ano)]),
         ["Média", tj.media, `${r.selecionados.length} anos`],
       ]) {
-        const { min, dataMin } = Grafico.minimoTrajetoria(serie, datas, r.idx_d);
-        const { max, dataMax } = Grafico.maximoTrajetoria(serie, datas, r.idx_d);
+        const { min, dataMin } = Grafico.minimoTrajetoria(serie, r.datas_proj);
+        const { max, dataMax } = Grafico.maximoTrajetoria(serie, r.datas_proj);
         linhas.push([nome, ano, fmt(min, 0), brD(dataMin),
                      min === null ? "" : fmt(r.cota_atual - min, 0),
                      fmt(max, 0), brD(dataMax),
@@ -252,7 +256,7 @@ const ExportarPDF = (() => {
           for (const [nome, serie] of [
             ...Grafico.curvasExtremas(r).map((c) => [c.nome, c.serie]),
             ["Média", tj.media]]) {
-            const { entrada, saida } = Grafico.cruzamentosTrajetoria(serie, datas, r.idx_d, alvo);
+            const { entrada, saida } = Grafico.cruzamentosTrajetoria(serie, r.datas_proj, alvo);
             linhasPC.push([rotulo, fmt(alvo, 0), nome,
                            entrada ? dataBR(entrada.data) : "não atinge",
                            saida ? dataBR(saida.data) : "—"]);
@@ -275,23 +279,17 @@ const ExportarPDF = (() => {
       y = nota(pdf, "Sem projeção (nenhum ano análogo no intervalo).", y, largura) + 3;
     }
 
-    y = tituloSecao(pdf, sec(`Série dia a dia (${r.ano_atual})`), y);
-    const datas = Grafico.datasDoAno(r.ano_atual);
-    const obs = docE.anos[String(r.ano_atual)];
+    y = tituloSecao(pdf, sec(`Série dia a dia (${brData(Grafico.inicioJanela(r))} a ${brData(r.fim_horizonte)})`), y);
     const serieCorpo = [];
-    for (let i = 0; i < 366; i++) {
-      if (datas[i] === null) continue;
-      const temObs = obs[i] !== null && obs[i] !== undefined;
-      const temProj = tj && i >= r.idx_d;
-      if (!temObs && !temProj) continue;
-      const interp = temProj && (tj.inferior_interp[i] || tj.superior_interp[i]);
+    for (const l of Grafico.linhasSerieDiaria(docE, r)) {
+      if (l.obs === null && !l.temProj) continue;
       serieCorpo.push([
-        datas[i].split("-").reverse().join("/"),
-        temObs ? fmt(obs[i], 0) : "",
-        temProj ? fmt(tj.inferior[i]) : "",
-        temProj ? fmt(tj.superior[i]) : "",
-        temProj ? fmt(tj.media[i]) : "",
-        interp ? "sim" : "",
+        brData(l.data),
+        l.obs === null ? "" : fmt(l.obs, 0),
+        l.temProj ? fmt(l.inferior) : "",
+        l.temProj ? fmt(l.superior) : "",
+        l.temProj ? fmt(l.media) : "",
+        l.interp ? "sim" : "",
       ]);
     }
     pdf.autoTable({
@@ -319,8 +317,9 @@ const ExportarPDF = (() => {
 
   function gerarMemoria(docE, r) {
     const unid = r.modo === "cm" ? "cm" : "pct";
+    const horiz = r.horizonte_meses === null || r.horizonte_meses === undefined ? "" : `_${r.horizonte_meses}m`;
     memoriaDoc(docE, r).save(
-      `memoria_${docE.slug}_${docE.ultima_data}_${String(r.range_valor).replace(".", ",")}${unid}.pdf`);
+      `memoria_${docE.slug}_${docE.ultima_data}_${String(r.range_valor).replace(".", ",")}${unid}${horiz}.pdf`);
   }
 
   /* ---------------- conjunto (paisagem, capa + 1 página/estação) ---------------- */
@@ -345,17 +344,18 @@ const ExportarPDF = (() => {
       return [
         doc.sintetica ? `${doc.nome} *` : doc.nome, doc.rio || "—",
         doc.ultima_data.split("-").reverse().join("/"), String(doc.ultimo_valor),
-        t(rotuloRange(resultado)), String(resultado.selecionados.length),
+        t(rotuloRange(resultado)), t(Grafico.rotuloHorizonte(resultado)),
+        String(resultado.selecionados.length),
       ];
     });
     pdf.autoTable({
       ...GRADE, startY: 75,
       styles: { ...GRADE.styles, fontSize: 9, cellPadding: 1.8 },
       head: [["Estação", "Rio", "Último dado", sinteticas.length ? "Cota / profund.* (cm)" : "Cota (cm)",
-              "Intervalo (cota atual ±)", "Anos análogos"]],
+              "Intervalo (cota atual ±)", "Horizonte", "Anos análogos"]],
       body: corpo,
-      columnStyles: { 3: { halign: "right" }, 5: { halign: "right" } },
-      margin: { left: 60, right: 60 },
+      columnStyles: { 3: { halign: "right" }, 6: { halign: "right" } },
+      margin: { left: 45, right: 45 },
       didParseCell: (d) => {
         if (d.section === "body" && linhasSinteticas.has(d.row.index)) {
           d.cell.styles.fillColor = [246, 243, 255];
@@ -394,7 +394,8 @@ const ExportarPDF = (() => {
         : `HidroWeb ${doc.codigo_hidroweb} · equip. ${doc.estcodigo_telemetria}`;
       pdf.text(t(`rio ${doc.rio || "—"} · ${identificacao} · ` +
                  `último dado ${doc.ultima_data.split("-").reverse().join("/")} (${doc.ultimo_valor} cm, ` +
-                 `${doc.fonte_ultimo_dado}) · intervalo ${rotuloRange(resultado)}`),
+                 `${doc.fonte_ultimo_dado}) · intervalo ${rotuloRange(resultado)} · ` +
+                 `horizonte ${Grafico.rotuloHorizonte(resultado)}`),
                MARGEM, MARGEM + 8);
       const altura = larguraUtil * 680 / 1400;
       pdf.addImage(png, "PNG", MARGEM, MARGEM + 12, larguraUtil, altura);
